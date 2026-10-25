@@ -1,0 +1,64 @@
+"phase.focus" = "专注";
+"phase.break" = "休息";
+
+"status.idle" = "未开始";
+"status.running" = "进行中";
+"status.paused" = "已暂停";
+
+"hint.focus.idle" = "开始一轮专注，结束后起来走走";
+"hint.focus.running" = "保持专注，结束后起来走走";
+"hint.focus.paused" = "计时已暂停，准备好再继续";
+"hint.break.idle" = "准备休息";
+"hint.break.running" = "起来走动一下，放松眼睛";
+"hint.break.paused" = "休息计时已暂停";
+"hint.longBreak.idle" = "准备长休";
+"hint.longBreak.running" = "长休开始，好好放松一下";
+"hint.longBreak.paused" = "长休计时已暂停";
+
+"phase.longBreak" = "长休";
+"round.progress" = "第 %d/%d 轮";
+"round.progressAccessibility" = "第 %d 轮，共 %d 轮";
+
+"action.start" = "开始";
+"action.pause" = "暂停";
+"action.resume" = "继续";
+"action.reset" = "重置";
+"action.skip" = "跳过";
+"action.settings" = "设置";
+"action.quit" = "退出";
+"action.fourRounds" = "专注循环";
+"action.fourRoundsHelp" = "开始 4 次专注和 3 次短休，随后进入 15 分钟长休";
+"action.cancelFourRounds" = "结束循环";
+"action.cancelFourRoundsHelp" = "结束专注循环并回到普通模式";
+
+"settings.language" = "语言";
+"sound.glass" = "玻璃";
+"sound.ping" = "叮咚";
+"sound.pop" = "气泡";
+"sound.hero" = "英雄";
+"sound.sosumi" = "经典";
+"sound.submarine" = "潜艇";
+"sound.tink" = "清脆";
+"sound.funk" = "放克";
+
+"settings.sound" = "提示音";
+"settings.soundEnabled" = "播放声音";
+"settings.focusDuration" = "专注时长";
+"settings.restDuration" = "休息时长";
+"unit.minutes" = "分钟";
+"action.previewSound" = "试听";
+"sound.previewFailed" = "无法播放这个声音。";
+"menu.accessibility" = "%@，%@，剩余 %@";
+
+
+"notification.note.unknown" = "开始计时时会请求通知权限，用于专注和休息结束提醒。";
+"notification.note.denied" = "通知已关闭，将收不到起身提醒。可在系统设置 > 通知中重新开启。";
+"notification.note.unavailable" = "通知不可用：请通过 Scripts/build-app.sh 生成 .app 后运行。";
+
+"notification.note.scheduleFailed" = "提醒安排失败，请检查通知设置后重试。";
+
+/* 通知标题与正文，跟随界面语言 */
+"notification.focusEnd.title" = "起来走走吧";
+"notification.focusEnd.body" = "专注时间结束，起身活动一下。";
+"notification.breakEnd.title" = "休息结束，可以继续了";
+"notification.breakEnd.body" = "准备好后开始下一轮专注。";

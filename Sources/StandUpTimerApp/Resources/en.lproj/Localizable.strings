@@ -1,0 +1,64 @@
+"phase.focus" = "Focus";
+"phase.break" = "Break";
+
+"status.idle" = "Not started";
+"status.running" = "Running";
+"status.paused" = "Paused";
+
+"hint.focus.idle" = "Start a focus session. Get up and move when it ends.";
+"hint.focus.running" = "Stay focused. Get up and move when it ends.";
+"hint.focus.paused" = "Timer paused. Continue when you are ready.";
+"hint.break.idle" = "Your break is ready.";
+"hint.break.running" = "Stand up, walk around, and rest your eyes.";
+"hint.break.paused" = "Break timer paused.";
+"hint.longBreak.idle" = "Your long break is ready.";
+"hint.longBreak.running" = "Long break. Rest and recharge.";
+"hint.longBreak.paused" = "Long break paused.";
+
+"phase.longBreak" = "Long break";
+"round.progress" = "Round %d/%d";
+"round.progressAccessibility" = "Round %d of %d";
+
+"action.start" = "Start";
+"action.pause" = "Pause";
+"action.resume" = "Resume";
+"action.reset" = "Reset";
+"action.skip" = "Skip";
+"action.settings" = "Settings";
+"action.quit" = "Quit";
+"action.fourRounds" = "Focus Cycle";
+"action.fourRoundsHelp" = "Start 4 focus sessions with 3 short breaks, followed by a 15-minute long break";
+"action.cancelFourRounds" = "End Cycle";
+"action.cancelFourRoundsHelp" = "End the focus cycle and return to normal mode";
+
+"settings.language" = "Language";
+"sound.glass" = "Glass";
+"sound.ping" = "Ping";
+"sound.pop" = "Pop";
+"sound.hero" = "Hero";
+"sound.sosumi" = "Sosumi";
+"sound.submarine" = "Submarine";
+"sound.tink" = "Tink";
+"sound.funk" = "Funk";
+
+"settings.sound" = "Sound";
+"settings.soundEnabled" = "Play sound";
+"settings.focusDuration" = "Focus length";
+"settings.restDuration" = "Break length";
+"unit.minutes" = "min";
+"action.previewSound" = "Preview sound";
+"sound.previewFailed" = "Couldn't play this sound.";
+"menu.accessibility" = "%@, %@, %@ remaining";
+
+
+"notification.note.unknown" = "Notification permission will be requested when you start the timer.";
+"notification.note.denied" = "Notifications are off. Enable them in System Settings > Notifications.";
+"notification.note.unavailable" = "Notifications require the packaged .app built with Scripts/build-app.sh.";
+
+"notification.note.scheduleFailed" = "Couldn't schedule the reminder. Check notification settings and try again.";
+
+/* 通知标题与正文，跟随界面语言 */
+"notification.focusEnd.title" = "Time to stand up";
+"notification.focusEnd.body" = "Focus time is over — stand up and move around.";
+"notification.breakEnd.title" = "Break is over";
+"notification.breakEnd.body" = "Start the next focus session when you're ready.";

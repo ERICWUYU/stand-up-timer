@@ -1,0 +1,26 @@
+# Build artifacts
+.build/
+.swiftpm/
+build/
+dist/
+*.app
+*.dSYM/
+*.xcarchive
+xcuserdata/
+*.xcuserstate
+
+# Local AI tooling and configuration
+claude-deepseek
+.claude/
+.cc-suite/
+.cc-suite.md
+docs/CLAUDE_STAGE_*.md
+
+# Internal development notes (kept locally, not published)
+GOALS.md
+RESEARCH.md
+PLANS.md
+PROMPTS.md
+
+# macOS
+.DS_Store
