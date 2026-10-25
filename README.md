@@ -2,6 +2,14 @@
 
 一个专为 macOS 设计的轻量菜单栏番茄钟。它在专注时间结束时提醒用户站起来、走动和休息，并在休息结束后提示继续工作。
 
+## 下载安装
+
+从 [Releases](https://github.com/ERICWUYU/stand-up-timer/releases/latest) 下载 `StandUpTimer-0.3.0-macos-universal.zip`，解压后将 `StandUpTimer.app` 拖入“应用程序”文件夹。
+
+- 通用二进制，支持 Apple Silicon 与 Intel Mac。
+- 最低系统版本：macOS 13。
+- 当前版本使用 ad-hoc 签名，未经 Apple 公证。首次打开若被 macOS 阻止，请前往“系统设置 → 隐私与安全性”，点击“仍要打开”。
+
 ## 当前状态
 
 - 已完成：产品范围、技术选择、验收标准、分步实施计划和 Xcode/SwiftUI 环境验证。
