@@ -4,7 +4,7 @@
 
 ## 下载安装
 
-从 [Releases](https://github.com/ERICWUYU/stand-up-timer/releases/latest) 下载 `StandUpTimer-0.3.0-macos-universal.zip`，解压后将 `StandUpTimer.app` 拖入“应用程序”文件夹。
+从 [Releases](https://github.com/ERICWUYU/stand-up-timer/releases/latest) 下载 `StandUpTimer-0.3.1-macos-universal.zip`，解压后将 `StandUpTimer.app` 拖入“应用程序”文件夹。
 
 - 通用二进制，支持 Apple Silicon 与 Intel Mac。
 - 最低系统版本：macOS 13。
