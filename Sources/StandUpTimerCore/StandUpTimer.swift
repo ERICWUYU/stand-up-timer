@@ -17,7 +17,7 @@ public struct StandUpTimer: Sendable {
 
     /// 计时模式：普通单轮，或“四轮连续”。
     ///
-    /// 四轮连续是用户选择的产品节奏：4 次专注与短休交替，最后以 15 分钟长休结束。
+    /// 四轮连续是用户选择的产品节奏：4 次专注与短休交替，最后以长休结束。
     /// 它不是健康保证，也不要求所有人遵守。
     public enum Mode: String, Codable, Equatable, Sendable {
         case single
@@ -32,12 +32,15 @@ public struct StandUpTimer: Sendable {
 
     /// 四轮连续模式的专注次数。
     public static let focusRoundCount = 4
-    /// 四轮连续模式中长休的固定时长；不提供单独设置。
+    /// 四轮连续模式长休的默认时长；实际值由设置决定。
     public static let defaultLongRestDuration: TimeInterval = 15 * 60
 
-    public private(set) var focusDuration: TimeInterval
-    public private(set) var restDuration: TimeInterval
-    public private(set) var longRestDuration: TimeInterval
+    // 普通计时器与 Focus Cycle 各自独立的时长设置。
+    public private(set) var normalFocusDuration: TimeInterval
+    public private(set) var normalRestDuration: TimeInterval
+    public private(set) var cycleFocusDuration: TimeInterval
+    public private(set) var cycleShortRestDuration: TimeInterval
+    public private(set) var cycleLongRestDuration: TimeInterval
 
     public private(set) var mode: Mode
     /// 当前专注轮次，范围 1...`focusRoundCount`；长休期间保留刚完成的轮次。
@@ -52,37 +55,82 @@ public struct StandUpTimer: Sendable {
     private var storedRemaining: TimeInterval
     /// 运行中唯一的计时依据。
     private var deadline: Date?
+    /// 当前阶段开始时实际采用的完整时长。
+    ///
+    /// 运行中或暂停中修改设置时，这个值保持不变；新设置只影响后续阶段。
+    private var currentPhaseFullDuration: TimeInterval
 
+    /// 旧版便捷初始化：普通模式和 Focus Cycle 使用同一组时长。
     public init(
         focusDuration: TimeInterval = 25 * 60,
         restDuration: TimeInterval = 5 * 60,
         longRestDuration: TimeInterval = StandUpTimer.defaultLongRestDuration
     ) {
-        precondition(
-            Self.isValidDuration(focusDuration)
-                && Self.isValidDuration(restDuration)
-                && Self.isValidDuration(longRestDuration),
-            "focusDuration、restDuration 和 longRestDuration 必须是正的有限值"
+        self.init(
+            normalFocusDuration: focusDuration,
+            normalRestDuration: restDuration,
+            cycleFocusDuration: focusDuration,
+            cycleShortRestDuration: restDuration,
+            cycleLongRestDuration: longRestDuration
         )
-        self.focusDuration = focusDuration
-        self.restDuration = restDuration
-        self.longRestDuration = longRestDuration
+    }
+
+    /// 普通模式与 Focus Cycle 使用独立时长。
+    public init(
+        normalFocusDuration: TimeInterval,
+        normalRestDuration: TimeInterval,
+        cycleFocusDuration: TimeInterval,
+        cycleShortRestDuration: TimeInterval,
+        cycleLongRestDuration: TimeInterval
+    ) {
+        precondition(
+            Self.isValidDuration(normalFocusDuration)
+                && Self.isValidDuration(normalRestDuration)
+                && Self.isValidDuration(cycleFocusDuration)
+                && Self.isValidDuration(cycleShortRestDuration)
+                && Self.isValidDuration(cycleLongRestDuration),
+            "所有时长必须是正的有限值"
+        )
+        self.normalFocusDuration = normalFocusDuration
+        self.normalRestDuration = normalRestDuration
+        self.cycleFocusDuration = cycleFocusDuration
+        self.cycleShortRestDuration = cycleShortRestDuration
+        self.cycleLongRestDuration = cycleLongRestDuration
         self.mode = .single
         self.focusRound = 1
         self.restKind = .short
         self.phase = .focus
         self.status = .idle
-        self.storedRemaining = focusDuration
+        self.storedRemaining = normalFocusDuration
+        self.currentPhaseFullDuration = normalFocusDuration
     }
 
-    /// 当前阶段的完整时长。
+    /// 当前模式下的专注时长，供旧调用方读取。
+    public var focusDuration: TimeInterval {
+        mode == .fourRound ? cycleFocusDuration : normalFocusDuration
+    }
+
+    /// 当前模式下的短休时长。
+    public var restDuration: TimeInterval {
+        mode == .fourRound ? cycleShortRestDuration : normalRestDuration
+    }
+
+    /// Focus Cycle 的长休时长。
+    public var longRestDuration: TimeInterval {
+        cycleLongRestDuration
+    }
+
+    /// 当前阶段实际采用的完整时长。
     public var currentPhaseDuration: TimeInterval {
-        phase == .focus ? focusDuration : restDuration(for: restKind)
+        currentPhaseFullDuration
     }
 
-    /// 指定休息类型对应的时长。
+    /// 指定休息类型对应当前模式的时长。
     public func restDuration(for kind: RestKind) -> TimeInterval {
-        kind == .long ? longRestDuration : restDuration
+        if mode == .fourRound, kind == .long {
+            return cycleLongRestDuration
+        }
+        return restDuration
     }
 
     /// 是否处于活动中的四轮系列。
@@ -99,24 +147,55 @@ public struct StandUpTimer: Sendable {
         value.isFinite && value > 0
     }
 
-    /// 更新时长设置。
+    /// 更新全部时长设置。
     ///
-    /// 空闲时立即采用当前阶段新的完整时长；运行中或暂停中保持当前阶段的剩余时间
-    /// 与原截止时间，新时长从下一次进入对应阶段、重置该阶段或开始新周期时生效。
+    /// 空闲时立即采用当前模式、当前阶段的新完整时长；运行中或暂停中保持
+    /// 当前阶段的剩余时间与原截止时间，新时长从下一次进入对应阶段、
+    /// 重置该阶段或开始新周期时生效。
+    public mutating func updateDurations(
+        normalFocusDuration: TimeInterval,
+        normalRestDuration: TimeInterval,
+        cycleFocusDuration: TimeInterval,
+        cycleShortRestDuration: TimeInterval,
+        cycleLongRestDuration: TimeInterval
+    ) {
+        precondition(
+            Self.isValidDuration(normalFocusDuration)
+                && Self.isValidDuration(normalRestDuration)
+                && Self.isValidDuration(cycleFocusDuration)
+                && Self.isValidDuration(cycleShortRestDuration)
+                && Self.isValidDuration(cycleLongRestDuration),
+            "所有时长必须是正的有限值"
+        )
+        self.normalFocusDuration = normalFocusDuration
+        self.normalRestDuration = normalRestDuration
+        self.cycleFocusDuration = cycleFocusDuration
+        self.cycleShortRestDuration = cycleShortRestDuration
+        self.cycleLongRestDuration = cycleLongRestDuration
+
+        if status == .idle {
+            currentPhaseFullDuration = configuredDuration(
+                for: phase,
+                in: mode,
+                restKind: restKind
+            )
+            storedRemaining = currentPhaseFullDuration
+        }
+    }
+
+    /// 旧版便捷更新：普通模式和 Focus Cycle 同步采用新的专注与短休时长。
     public mutating func updateDurations(
         focusDuration: TimeInterval,
         restDuration: TimeInterval
     ) {
-        precondition(
-            Self.isValidDuration(focusDuration) && Self.isValidDuration(restDuration),
-            "focusDuration 和 restDuration 必须是正的有限值"
+        let longRest = cycleLongRestDuration
+        updateDurations(
+            normalFocusDuration: focusDuration,
+            normalRestDuration: restDuration,
+            cycleFocusDuration: focusDuration,
+            cycleShortRestDuration: restDuration,
+            cycleLongRestDuration: longRest
         )
-        self.focusDuration = focusDuration
-        self.restDuration = restDuration
-
-        if status == .idle {
-            storedRemaining = currentPhaseDuration
-        }
     }
 
     /// 按真实时间计算剩余时长；运行中始终由截止时间点推导，不做累减。
@@ -143,8 +222,9 @@ public struct StandUpTimer: Sendable {
         restKind = .short
         phase = .focus
         status = .running
-        storedRemaining = focusDuration
-        deadline = now.addingTimeInterval(focusDuration)
+        currentPhaseFullDuration = cycleFocusDuration
+        storedRemaining = cycleFocusDuration
+        deadline = now.addingTimeInterval(cycleFocusDuration)
     }
 
     /// 取消四轮系列，立即回到普通模式的空闲专注，轮次归零。
@@ -179,7 +259,12 @@ public struct StandUpTimer: Sendable {
     public mutating func reset() {
         status = .idle
         deadline = nil
-        storedRemaining = currentPhaseDuration
+        currentPhaseFullDuration = configuredDuration(
+            for: phase,
+            in: mode,
+            restKind: restKind
+        )
+        storedRemaining = currentPhaseFullDuration
     }
 
     /// 立即切换到下一阶段。
@@ -201,7 +286,8 @@ public struct StandUpTimer: Sendable {
                 phase = .focus
                 status = .idle
                 deadline = nil
-                storedRemaining = focusDuration
+                currentPhaseFullDuration = normalFocusDuration
+                storedRemaining = normalFocusDuration
             }
         }
     }
@@ -223,9 +309,9 @@ public struct StandUpTimer: Sendable {
                     && focusRound >= Self.focusRoundCount ? .long : .short
                 restKind = kind
                 phase = .rest
-                let restDeadline = deadline.addingTimeInterval(
-                    restDuration(for: kind)
-                )
+                let duration = restDuration(for: kind)
+                currentPhaseFullDuration = duration
+                let restDeadline = deadline.addingTimeInterval(duration)
                 self.deadline = restDeadline
                 storedRemaining = max(0, restDeadline.timeIntervalSince(now))
             case .rest:
@@ -236,14 +322,16 @@ public struct StandUpTimer: Sendable {
                     focusRound += 1
                     restKind = .short
                     phase = .focus
-                    let focusDeadline = deadline.addingTimeInterval(focusDuration)
+                    currentPhaseFullDuration = cycleFocusDuration
+                    let focusDeadline = deadline.addingTimeInterval(cycleFocusDuration)
                     self.deadline = focusDeadline
                     storedRemaining = max(0, focusDeadline.timeIntervalSince(now))
                 } else {
                     phase = .focus
                     status = .idle
                     self.deadline = nil
-                    storedRemaining = focusDuration
+                    currentPhaseFullDuration = normalFocusDuration
+                    storedRemaining = normalFocusDuration
                 }
             }
         }
@@ -253,11 +341,29 @@ public struct StandUpTimer: Sendable {
 
     // MARK: - 内部转换
 
+    private func configuredDuration(
+        for phase: Phase,
+        in mode: Mode,
+        restKind: RestKind
+    ) -> TimeInterval {
+        switch (mode, phase) {
+        case (.single, .focus):
+            return normalFocusDuration
+        case (.single, .rest):
+            return normalRestDuration
+        case (.fourRound, .focus):
+            return cycleFocusDuration
+        case (.fourRound, .rest):
+            return restKind == .long ? cycleLongRestDuration : cycleShortRestDuration
+        }
+    }
+
     private mutating func beginRest(_ kind: RestKind, at now: Date) {
         restKind = kind
         phase = .rest
         status = .running
         let duration = restDuration(for: kind)
+        currentPhaseFullDuration = duration
         storedRemaining = duration
         deadline = now.addingTimeInterval(duration)
     }
@@ -267,8 +373,10 @@ public struct StandUpTimer: Sendable {
         restKind = .short
         phase = .focus
         status = .running
-        storedRemaining = focusDuration
-        deadline = now.addingTimeInterval(focusDuration)
+        let duration = mode == .fourRound ? cycleFocusDuration : normalFocusDuration
+        currentPhaseFullDuration = duration
+        storedRemaining = duration
+        deadline = now.addingTimeInterval(duration)
     }
 
     /// 结束系列：回到普通模式的空闲专注，轮次归零。
@@ -279,7 +387,8 @@ public struct StandUpTimer: Sendable {
         phase = .focus
         status = .idle
         deadline = nil
-        storedRemaining = focusDuration
+        currentPhaseFullDuration = normalFocusDuration
+        storedRemaining = normalFocusDuration
     }
 }
 
@@ -290,9 +399,12 @@ extension StandUpTimer {
     /// 普通模式却停在后续轮次或长休）时返回 nil，调用方据此回到默认空闲状态。
     public init?(snapshot: StandUpTimerSnapshot) {
         guard StandUpTimerSnapshot.isSupported(version: snapshot.version),
-              Self.isValidDuration(snapshot.focusDuration),
-              Self.isValidDuration(snapshot.restDuration),
-              Self.isValidDuration(snapshot.longRestDuration),
+              Self.isValidDuration(snapshot.normalFocusDuration),
+              Self.isValidDuration(snapshot.normalRestDuration),
+              Self.isValidDuration(snapshot.cycleFocusDuration),
+              Self.isValidDuration(snapshot.cycleShortRestDuration),
+              Self.isValidDuration(snapshot.cycleLongRestDuration),
+              Self.isValidDuration(snapshot.currentPhaseDuration),
               snapshot.remaining.isFinite,
               snapshot.remaining >= 0,
               (1...Self.focusRoundCount).contains(snapshot.focusRound)
@@ -314,24 +426,30 @@ extension StandUpTimer {
                 return nil
             }
             self.init(
-                focusDuration: snapshot.focusDuration,
-                restDuration: snapshot.restDuration,
-                longRestDuration: snapshot.longRestDuration
+                normalFocusDuration: snapshot.normalFocusDuration,
+                normalRestDuration: snapshot.normalRestDuration,
+                cycleFocusDuration: snapshot.cycleFocusDuration,
+                cycleShortRestDuration: snapshot.cycleShortRestDuration,
+                cycleLongRestDuration: snapshot.cycleLongRestDuration
             )
             self.applyIdentity(of: snapshot)
+            self.currentPhaseFullDuration = snapshot.currentPhaseDuration
             self.status = .running
             self.deadline = deadline
             // 运行中的剩余时间由截止时间推导，这个值只是占位。
-            self.storedRemaining = min(snapshot.remaining, currentPhaseDuration)
+            self.storedRemaining = min(snapshot.remaining, currentPhaseFullDuration)
 
         case .paused:
             guard snapshot.deadline == nil else { return nil }
             self.init(
-                focusDuration: snapshot.focusDuration,
-                restDuration: snapshot.restDuration,
-                longRestDuration: snapshot.longRestDuration
+                normalFocusDuration: snapshot.normalFocusDuration,
+                normalRestDuration: snapshot.normalRestDuration,
+                cycleFocusDuration: snapshot.cycleFocusDuration,
+                cycleShortRestDuration: snapshot.cycleShortRestDuration,
+                cycleLongRestDuration: snapshot.cycleLongRestDuration
             )
             self.applyIdentity(of: snapshot)
+            self.currentPhaseFullDuration = snapshot.currentPhaseDuration
             self.status = .paused
             self.deadline = nil
             // 暂停状态必须原样保留冻结的剩余时间。即使用户在暂停期间调短了
@@ -342,14 +460,20 @@ extension StandUpTimer {
         case .idle:
             guard snapshot.deadline == nil else { return nil }
             self.init(
-                focusDuration: snapshot.focusDuration,
-                restDuration: snapshot.restDuration,
-                longRestDuration: snapshot.longRestDuration
+                normalFocusDuration: snapshot.normalFocusDuration,
+                normalRestDuration: snapshot.normalRestDuration,
+                cycleFocusDuration: snapshot.cycleFocusDuration,
+                cycleShortRestDuration: snapshot.cycleShortRestDuration,
+                cycleLongRestDuration: snapshot.cycleLongRestDuration
             )
             self.applyIdentity(of: snapshot)
+            self.currentPhaseFullDuration = snapshot.currentPhaseDuration
             self.status = .idle
             self.deadline = nil
-            self.storedRemaining = min(snapshot.remaining, currentPhaseDuration)
+            self.storedRemaining = min(
+                snapshot.remaining,
+                currentPhaseFullDuration
+            )
         }
     }
 
@@ -374,7 +498,13 @@ extension StandUpTimer {
             mode: mode,
             focusRound: focusRound,
             restKind: restKind,
-            longRestDuration: longRestDuration
+            longRestDuration: cycleLongRestDuration,
+            normalFocusDuration: normalFocusDuration,
+            normalRestDuration: normalRestDuration,
+            cycleFocusDuration: cycleFocusDuration,
+            cycleShortRestDuration: cycleShortRestDuration,
+            cycleLongRestDuration: cycleLongRestDuration,
+            currentPhaseDuration: currentPhaseFullDuration
         )
     }
 }

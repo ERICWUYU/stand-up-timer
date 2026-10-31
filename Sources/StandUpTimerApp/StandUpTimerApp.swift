@@ -20,9 +20,5 @@ struct StandUpTimerApp: App {
             .accessibilityLabel(Text(model.menuBarAccessibilityLabel))
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView(model: model)
-        }
     }
 }

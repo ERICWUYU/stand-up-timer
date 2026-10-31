@@ -163,21 +163,13 @@ struct TimerMenuView: View {
         }
     }
 
-    @ViewBuilder
     private var settingsButton: some View {
-        if #available(macOS 14.0, *) {
-            SettingsLink {
-                settingsLabel
-            }
-            .buttonStyle(.plain)
-        } else {
-            Button {
-                openSettings()
-            } label: {
-                settingsLabel
-            }
-            .buttonStyle(.plain)
+        Button {
+            SettingsWindowController.shared.show(model: model)
+        } label: {
+            settingsLabel
         }
+        .buttonStyle(.plain)
     }
 
     private var settingsLabel: some View {
@@ -200,20 +192,5 @@ struct TimerMenuView: View {
         .padding(.vertical, 4)
         .padding(.horizontal, 4)
         .contentShape(Rectangle())
-    }
-
-    /// macOS 13 没有 SettingsLink，用窗口选择器打开 Settings scene。
-    private func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        // 两个选择器都没有响应时说明系统不提供设置窗口，
-        // 记录日志，避免按钮看起来“点了没反应”。
-        let opened = NSApp.sendAction(
-            Selector(("showSettingsWindow:")), to: nil, from: nil
-        ) || NSApp.sendAction(
-            Selector(("showPreferencesWindow:")), to: nil, from: nil
-        )
-        if !opened {
-            NSLog("无法打开设置窗口：系统未响应 showSettingsWindow:/showPreferencesWindow:")
-        }
     }
 }

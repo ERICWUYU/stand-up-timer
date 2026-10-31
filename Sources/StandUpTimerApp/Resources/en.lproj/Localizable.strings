@@ -27,7 +27,7 @@
 "action.settings" = "Settings";
 "action.quit" = "Quit";
 "action.fourRounds" = "Focus Cycle";
-"action.fourRoundsHelp" = "Start 4 focus sessions with 3 short breaks, followed by a 15-minute long break";
+"action.fourRoundsHelp" = "Start 4 focus sessions with short breaks and finish with a long break";
 "action.cancelFourRounds" = "End Cycle";
 "action.cancelFourRoundsHelp" = "End the focus cycle and return to normal mode";
 
@@ -43,9 +43,19 @@
 
 "settings.sound" = "Sound";
 "settings.soundEnabled" = "Play sound";
+"settings.section.normal" = "Normal timer";
+"settings.section.cycle" = "Focus Cycle (4 rounds)";
+"settings.normal.focusDuration" = "Focus length";
+"settings.normal.restDuration" = "Break length";
+"settings.cycle.focusDuration" = "Focus length";
+"settings.cycle.shortRestDuration" = "Short break";
+"settings.cycle.longRestDuration" = "Long break";
+"settings.durationAccessibility" = "%@, %@";
+/* 旧的共享时长键保留给旧版本资源，当前界面使用上面的分区键。 */
 "settings.focusDuration" = "Focus length";
 "settings.restDuration" = "Break length";
 "unit.minutes" = "min";
+"unit.minutesAccessibility" = "%d minutes";
 "action.previewSound" = "Preview sound";
 "sound.previewFailed" = "Couldn't play this sound.";
 "menu.accessibility" = "%@, %@, %@ remaining";

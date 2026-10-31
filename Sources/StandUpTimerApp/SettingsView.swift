@@ -2,17 +2,67 @@ import AppKit
 import StandUpTimerCore
 import SwiftUI
 
-/// 设置窗口：语言、专注/休息时长、提醒声音。
-/// 语言卡片沿用面板里原有的绿色样式，只改变所在位置。
+/// 设置窗口：语言、普通计时器时长、Focus Cycle 时长、提醒声音。
 struct SettingsView: View {
     @ObservedObject var model: TimerModel
     @State private var isChinese = false
     @State private var previewFailed = false
 
+    static func windowTitle(for language: AppLanguage) -> String {
+        language == .chinese ? "“番茄钟”设置" : "Pomodoro Timer Settings"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             languageCard
-            durationRows
+            durationSection(titleKey: "settings.section.normal") {
+                durationRow(
+                    icon: "target",
+                    sectionKey: "settings.section.normal",
+                    titleKey: "settings.normal.focusDuration",
+                    minutes: normalFocusMinutes,
+                    range: TimerSettings.focusRange
+                )
+
+                Divider().opacity(0.5)
+
+                durationRow(
+                    icon: "figure.walk",
+                    sectionKey: "settings.section.normal",
+                    titleKey: "settings.normal.restDuration",
+                    minutes: normalRestMinutes,
+                    range: TimerSettings.restRange
+                )
+            }
+            durationSection(titleKey: "settings.section.cycle") {
+                durationRow(
+                    icon: "target",
+                    sectionKey: "settings.section.cycle",
+                    titleKey: "settings.cycle.focusDuration",
+                    minutes: cycleFocusMinutes,
+                    range: TimerSettings.focusRange
+                )
+
+                Divider().opacity(0.5)
+
+                durationRow(
+                    icon: "figure.walk",
+                    sectionKey: "settings.section.cycle",
+                    titleKey: "settings.cycle.shortRestDuration",
+                    minutes: cycleShortRestMinutes,
+                    range: TimerSettings.restRange
+                )
+
+                Divider().opacity(0.5)
+
+                durationRow(
+                    icon: "bed.double",
+                    sectionKey: "settings.section.cycle",
+                    titleKey: "settings.cycle.longRestDuration",
+                    minutes: cycleLongRestMinutes,
+                    range: TimerSettings.restRange
+                )
+            }
             soundRow
             if previewFailed {
                 Text(L10n.text("sound.previewFailed", language: model.language))
@@ -22,7 +72,7 @@ struct SettingsView: View {
         }
         .padding(20)
         .frame(width: 400)
-        .background(SettingsWindowActivator(title: windowTitle))
+        .background(SettingsWindowTitle(title: windowTitle))
         .onAppear {
             isChinese = model.language == .chinese
         }
@@ -37,7 +87,7 @@ struct SettingsView: View {
 
     /// 系统标题按系统语言显示，这里改成跟随应用内语言。
     private var windowTitle: String {
-        model.language == .chinese ? "“番茄钟”设置" : "Pomodoro Timer Settings"
+        Self.windowTitle(for: model.language)
     }
 
     private var languageCard: some View {
@@ -46,16 +96,19 @@ struct SettingsView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.green)
                 .frame(width: 20)
+                .accessibilityHidden(true)
 
             Text(L10n.text("settings.language", language: model.language))
                 .font(.subheadline)
                 .fixedSize()
+                .accessibilityHidden(true)
 
             Spacer()
 
             Text(model.language == .english ? "English" : "中文")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
             Toggle(
                 L10n.text("settings.language", language: model.language),
@@ -63,6 +116,9 @@ struct SettingsView: View {
             )
             .labelsHidden()
             .toggleStyle(.switch)
+            .accessibilityLabel(
+                Text(L10n.text("settings.language", language: model.language))
+            )
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -76,28 +132,34 @@ struct SettingsView: View {
         )
     }
 
-    private var durationRows: some View {
-        VStack(spacing: 0) {
-            durationRow(
-                icon: "target",
-                titleKey: "settings.focusDuration",
-                minutes: focusMinutes,
-                range: TimerSettings.focusRange
+    /// 两个时长分区共用的紧凑样式：浅色分组，不使用大面积彩色卡片。
+    private func durationSection<Content: View>(
+        titleKey: String,
+        @ViewBuilder rows: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L10n.text(titleKey, language: model.language))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+
+            VStack(spacing: 0) {
+                rows()
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.primary.opacity(0.035))
             )
-
-            Divider().opacity(0.5)
-
-            durationRow(
-                icon: "figure.walk",
-                titleKey: "settings.restDuration",
-                minutes: restMinutes,
-                range: TimerSettings.restRange
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
             )
         }
     }
 
     private func durationRow(
         icon: String,
+        sectionKey: String,
         titleKey: String,
         minutes: Binding<Int>,
         range: ClosedRange<Int>
@@ -107,10 +169,12 @@ struct SettingsView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 20)
+                .accessibilityHidden(true)
 
             Text(L10n.text(titleKey, language: model.language))
                 .font(.subheadline)
                 .fixedSize()
+                .accessibilityHidden(true)
 
             Spacer()
 
@@ -123,9 +187,31 @@ struct SettingsView: View {
                 .frame(minWidth: 56, alignment: .trailing)
             }
             .fixedSize()
+            .accessibilityLabel(Text(accessibilityLabel(
+                sectionKey: sectionKey,
+                titleKey: titleKey
+            )))
+            .accessibilityValue(Text(String(
+                format: L10n.text(
+                    "unit.minutesAccessibility",
+                    language: model.language
+                ),
+                minutes.wrappedValue
+            )))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+    }
+
+    private func accessibilityLabel(sectionKey: String, titleKey: String) -> String {
+        String(
+            format: L10n.text(
+                "settings.durationAccessibility",
+                language: model.language
+            ),
+            L10n.text(sectionKey, language: model.language),
+            L10n.text(titleKey, language: model.language)
+        )
     }
 
     private var soundRow: some View {
@@ -178,6 +264,9 @@ struct SettingsView: View {
             .labelsHidden()
             .toggleStyle(.switch)
             .help(L10n.text("settings.soundEnabled", language: model.language))
+            .accessibilityLabel(
+                Text(L10n.text("settings.soundEnabled", language: model.language))
+            )
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -208,51 +297,63 @@ struct SettingsView: View {
         )
     }
 
-    private var focusMinutes: Binding<Int> {
+    private var normalFocusMinutes: Binding<Int> {
         Binding(
             get: { model.settings.focusMinutes },
-            set: { model.setFocusMinutes($0) }
+            set: { model.setNormalFocusMinutes($0) }
         )
     }
 
-    private var restMinutes: Binding<Int> {
+    private var normalRestMinutes: Binding<Int> {
         Binding(
             get: { model.settings.restMinutes },
-            set: { model.setRestMinutes($0) }
+            set: { model.setNormalRestMinutes($0) }
+        )
+    }
+
+    private var cycleFocusMinutes: Binding<Int> {
+        Binding(
+            get: { model.settings.cycleFocusMinutes },
+            set: { model.setCycleFocusMinutes($0) }
+        )
+    }
+
+    private var cycleShortRestMinutes: Binding<Int> {
+        Binding(
+            get: { model.settings.cycleShortRestMinutes },
+            set: { model.setCycleShortRestMinutes($0) }
+        )
+    }
+
+    private var cycleLongRestMinutes: Binding<Int> {
+        Binding(
+            get: { model.settings.cycleLongRestMinutes },
+            set: { model.setCycleLongRestMinutes($0) }
         )
     }
 }
 
-/// 菜单栏应用（LSUIElement）不会自动激活窗口。
-/// 设置窗口出现时主动激活应用并把它带到最前面。
-private struct SettingsWindowActivator: NSViewRepresentable {
+/// 只负责同步窗口标题，不再承担激活或前置逻辑。
+/// 窗口身份由 `SettingsWindowController` 的稳定 identifier 决定，与标题无关。
+private struct SettingsWindowTitle: NSViewRepresentable {
     let title: String
 
     func makeNSView(context: Context) -> NSView {
-        let view = ActivatorView()
+        let view = TitleView()
         view.applyTitle(title)
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView as? ActivatorView)?.applyTitle(title)
+        (nsView as? TitleView)?.applyTitle(title)
     }
 
-    private final class ActivatorView: NSView {
+    private final class TitleView: NSView {
         private var title = ""
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            guard let window else { return }
-
             applyTitle(title)
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
-            // 窗口可能刚创建、还没完成布局，下一轮事件循环再前置一次。
-            DispatchQueue.main.async {
-                NSApp.activate(ignoringOtherApps: true)
-                window.makeKeyAndOrderFront(nil)
-            }
         }
 
         func applyTitle(_ title: String) {

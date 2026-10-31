@@ -258,25 +258,77 @@ final class TimerModel: ObservableObject {
         notificationsDidChange(requestAuthorization: false)
     }
 
-    func setFocusMinutes(_ minutes: Int) {
+    func setNormalFocusMinutes(_ minutes: Int) {
         updateSettings(
-            TimerSettings(focusMinutes: minutes, restMinutes: settings.restMinutes)
+            TimerSettings(
+                focusMinutes: minutes,
+                restMinutes: settings.restMinutes,
+                cycleFocusMinutes: settings.cycleFocusMinutes,
+                cycleShortRestMinutes: settings.cycleShortRestMinutes,
+                cycleLongRestMinutes: settings.cycleLongRestMinutes
+            )
         )
     }
 
-    func setRestMinutes(_ minutes: Int) {
+    func setNormalRestMinutes(_ minutes: Int) {
         updateSettings(
-            TimerSettings(focusMinutes: settings.focusMinutes, restMinutes: minutes)
+            TimerSettings(
+                focusMinutes: settings.focusMinutes,
+                restMinutes: minutes,
+                cycleFocusMinutes: settings.cycleFocusMinutes,
+                cycleShortRestMinutes: settings.cycleShortRestMinutes,
+                cycleLongRestMinutes: settings.cycleLongRestMinutes
+            )
+        )
+    }
+
+    func setCycleFocusMinutes(_ minutes: Int) {
+        updateSettings(
+            TimerSettings(
+                focusMinutes: settings.focusMinutes,
+                restMinutes: settings.restMinutes,
+                cycleFocusMinutes: minutes,
+                cycleShortRestMinutes: settings.cycleShortRestMinutes,
+                cycleLongRestMinutes: settings.cycleLongRestMinutes
+            )
+        )
+    }
+
+    func setCycleShortRestMinutes(_ minutes: Int) {
+        updateSettings(
+            TimerSettings(
+                focusMinutes: settings.focusMinutes,
+                restMinutes: settings.restMinutes,
+                cycleFocusMinutes: settings.cycleFocusMinutes,
+                cycleShortRestMinutes: minutes,
+                cycleLongRestMinutes: settings.cycleLongRestMinutes
+            )
+        )
+    }
+
+    func setCycleLongRestMinutes(_ minutes: Int) {
+        updateSettings(
+            TimerSettings(
+                focusMinutes: settings.focusMinutes,
+                restMinutes: settings.restMinutes,
+                cycleFocusMinutes: settings.cycleFocusMinutes,
+                cycleShortRestMinutes: settings.cycleShortRestMinutes,
+                cycleLongRestMinutes: minutes
+            )
         )
     }
 
     private func updateSettings(_ newSettings: TimerSettings) {
         guard newSettings != settings else { return }
         settings = newSettings
-        // 空闲时立即采用新时长；运行中或暂停中保持当前截止点。
+        // 空闲时立即采用当前模式的新时长；运行中或暂停中保持当前截止点，
+        // 新设置从下一个对应阶段开始生效。
         timer.updateDurations(
-            focusDuration: newSettings.focusDuration,
-            restDuration: newSettings.restDuration
+            normalFocusDuration: newSettings.focusDuration,
+            normalRestDuration: newSettings.restDuration,
+            cycleFocusDuration: newSettings.cycleFocusDuration,
+            cycleShortRestDuration: newSettings.cycleShortRestDuration,
+            cycleLongRestDuration: newSettings.cycleLongRestDuration
         )
         if persistsState {
             store.save(newSettings)
