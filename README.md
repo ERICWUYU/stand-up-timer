@@ -57,3 +57,5 @@ Scripts/build-app.sh
 ```
 
 `swift test` 运行全部核心测试；`Scripts/build-app.sh` 生成 `.build/StandUpTimer.app`。
+
+打包图标资源需要 Xcode 提供的 `actool`（用于把 `Support/Assets.xcassets` 编译成 `Assets.car`）；只安装 Command Line Tools 时 `swift test` 仍可运行，但无法完成 app 打包。

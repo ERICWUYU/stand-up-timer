@@ -12,7 +12,7 @@ final class SettingsWindowController {
 
     /// 稳定身份；窗口标题可以随中英文切换，但查找从不依赖标题。
     static let windowIdentifier = NSUserInterfaceItemIdentifier(
-        "com.standuptimer.menubar.settings"
+        "com.standuptimer.timer.settings"
     )
 
     private var window: NSWindow?
