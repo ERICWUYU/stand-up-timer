@@ -19,15 +19,17 @@ public enum TimerStartup {
         overrideDuration: TimeInterval?,
         now: Date
     ) -> TimerStartupResult {
-        // 人工测试时长只覆盖本次进程：专注、短休和长休同时缩短。
+        // 人工测试时长只覆盖本次进程：普通模式与 Focus Cycle 的所有阶段同时缩短。
         if let overrideDuration,
            overrideDuration.isFinite,
            overrideDuration > 0 {
             return TimerStartupResult(
                 timer: StandUpTimer(
-                    focusDuration: overrideDuration,
-                    restDuration: overrideDuration,
-                    longRestDuration: overrideDuration
+                    normalFocusDuration: overrideDuration,
+                    normalRestDuration: overrideDuration,
+                    cycleFocusDuration: overrideDuration,
+                    cycleShortRestDuration: overrideDuration,
+                    cycleLongRestDuration: overrideDuration
                 ),
                 usesOverride: true,
                 persistsState: false
@@ -35,10 +37,13 @@ public enum TimerStartup {
         }
 
         if let restored, var timer = StandUpTimer(snapshot: restored) {
-            // 设置里的时长优先于旧快照；运行中或暂停中不会因此跳时。
+            // 设置优先于旧快照；运行中或暂停中只更新后续阶段，不会让当前截止点跳时。
             timer.updateDurations(
-                focusDuration: settings.focusDuration,
-                restDuration: settings.restDuration
+                normalFocusDuration: settings.focusDuration,
+                normalRestDuration: settings.restDuration,
+                cycleFocusDuration: settings.cycleFocusDuration,
+                cycleShortRestDuration: settings.cycleShortRestDuration,
+                cycleLongRestDuration: settings.cycleLongRestDuration
             )
             // 用注入的当前时间连续结算关闭期间跨过的阶段，
             // 不会重新得到一整段完整时长。
@@ -52,8 +57,11 @@ public enum TimerStartup {
 
         return TimerStartupResult(
             timer: StandUpTimer(
-                focusDuration: settings.focusDuration,
-                restDuration: settings.restDuration
+                normalFocusDuration: settings.focusDuration,
+                normalRestDuration: settings.restDuration,
+                cycleFocusDuration: settings.cycleFocusDuration,
+                cycleShortRestDuration: settings.cycleShortRestDuration,
+                cycleLongRestDuration: settings.cycleLongRestDuration
             ),
             usesOverride: false,
             persistsState: true

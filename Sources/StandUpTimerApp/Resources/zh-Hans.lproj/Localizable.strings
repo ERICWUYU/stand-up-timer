@@ -27,7 +27,7 @@
 "action.settings" = "设置";
 "action.quit" = "退出";
 "action.fourRounds" = "专注循环";
-"action.fourRoundsHelp" = "开始 4 次专注和 3 次短休，随后进入 15 分钟长休";
+"action.fourRoundsHelp" = "开始 4 次专注和短休，最后进入长休";
 "action.cancelFourRounds" = "结束循环";
 "action.cancelFourRoundsHelp" = "结束专注循环并回到普通模式";
 
@@ -43,9 +43,19 @@
 
 "settings.sound" = "提示音";
 "settings.soundEnabled" = "播放声音";
+"settings.section.normal" = "普通计时器";
+"settings.section.cycle" = "Focus Cycle（4 轮）";
+"settings.normal.focusDuration" = "专注时长";
+"settings.normal.restDuration" = "休息时长";
+"settings.cycle.focusDuration" = "专注时长";
+"settings.cycle.shortRestDuration" = "短休时长";
+"settings.cycle.longRestDuration" = "长休时长";
+"settings.durationAccessibility" = "%@，%@";
+/* 旧的共享时长键保留给旧版本资源，当前界面使用上面的分区键。 */
 "settings.focusDuration" = "专注时长";
 "settings.restDuration" = "休息时长";
 "unit.minutes" = "分钟";
+"unit.minutesAccessibility" = "%d 分钟";
 "action.previewSound" = "试听";
 "sound.previewFailed" = "无法播放这个声音。";
 "menu.accessibility" = "%@，%@，剩余 %@";

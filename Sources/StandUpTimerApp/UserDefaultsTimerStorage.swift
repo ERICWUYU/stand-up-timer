@@ -45,4 +45,8 @@ final class UserDefaultsTimerStorage: TimerStorage {
             defaults.removeObject(forKey: key)
         }
     }
+
+    func containsValue(forKey key: String) -> Bool {
+        defaults.object(forKey: key) != nil
+    }
 }
