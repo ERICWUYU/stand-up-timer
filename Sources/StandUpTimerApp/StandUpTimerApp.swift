@@ -1,4 +1,5 @@
 import SwiftUI
+import StandUpTimerCore
 
 @main
 struct StandUpTimerApp: App {
