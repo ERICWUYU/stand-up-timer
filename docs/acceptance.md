@@ -21,8 +21,73 @@
 - [x] 运行或暂停时修改时长不改变当前阶段剩余时间，从下一阶段起生效；空闲时立即更新当前阶段完整时长。
 - [x] 快照保存并恢复模式、轮次、当前阶段及当时实际使用的时长。
 - [x] 通知时间线使用对应模式的专注、短休与长休时长。
+- [x] 旧 bundle id 偏好域迁移（`LegacyPreferences`）由
+  `LegacyPreferencesMigrationTests` 在一次性的临时 CFPreferences 域与独立
+  UserDefaults suite 中隔离验证：复制全部键类型、只补缺失键、哨兵保证只迁移
+  一次、旧域只读不写；测试不触碰真实 `.standard` 与线上旧域。自动化测试共
+  85/85 通过。
 
-## 人工验证
+## 0.4.0 分发归档验证
+
+以下全部针对 **从发布 zip 解压到全新临时目录的 `StandUpTimer.app`**，
+不是 `.build` 里的组装产物。归档必须从最终 tag 的干净检出只构建一次，
+验收通过的字节即上传发布的字节。
+
+- [ ] `lipo -archs` 同时包含 `arm64` 与 `x86_64`。
+- [ ] `vtool -show-build` 两个切片的最低系统版本均为 macOS 13.0。
+- [ ] `codesign --verify --deep --strict` 通过；`codesign -dvv` 标识为
+      `com.standuptimer.timer`、ad-hoc 签名、无 Team ID。
+- [ ] `Info.plist`：版本 0.4.0（build 4）、最低 13.0、`LSUIElement`。
+- [ ] `Contents/Resources` 中 `AppIcon.icns` 与 `Assets.car` 均非空；
+      资源 bundle 同时包含 `en.lproj` 与 `zh-Hans.lproj`。
+- [ ] zip 顶层条目为 `StandUpTimer.app/`（`--keepParent`）；
+      zip 的 SHA-256 与随附 `SHA256SUMS.txt` 一致。
+- [ ] 退出所有正在运行的副本后，Rosetta 下冒烟启动通过：
+      `arch -x86_64 open StandUpTimer.app --args --test-durations 10`。
+      Intel 机器与 macOS 13 真机运行未验证，作为显式限制记录。
+
+## 0.4.0 人工验收（全新 macOS 用户）
+
+**证据表头（每项结果都必须能对应到这一行）：** 日期、机器型号、macOS
+版本、芯片架构、归档文件名与 SHA-256、测试用户（必须是不含
+`com.standuptimer.timer` 通知记录和迁移哨兵的全新用户）、通知权限初始状态。
+
+关键背景：通知横幅图标按 bundle id 缓存且不可逆转，现有开发账号已有该
+id 的快照与迁移哨兵，不能作为图标和首次迁移的证据；只有全新用户的
+首次通知有效。
+
+开始前在全新用户下用 `defaults` 向旧域 `com.standuptimer.menubar`
+播种 0.3.1 形态的夹具：`standUpTimer.focusMinutes`、
+`standUpTimer.restMinutes`、`standUpTimer.soundEnabled`、
+`standUpTimer.sound`、`standUpTimer.language`、`standUpTimer.state`；
+另准备一个在新域预置部分键的变体，验证“只补缺失键”。
+
+按下列顺序执行（权限状态会相互影响，拒绝测试放最后）：
+
+- [ ] 1. 首次启动即迁移：新域出现旧值且与夹具一致；旧域内容不变；
+      哨兵置位；再次启动不覆盖用户改动。
+- [ ] 2. 新 bundle id 下通知授权只请求一次；授权后状态正确。
+- [ ] 3. **通知横幅图标非空白方块**（先中文再英文各观察一次）——
+      这是不可修复项，若失败则停止发布，需要更换 bundle id 重做。
+- [ ] 4. Focus Cycle 10 秒短时长：4 次专注结束、3 次短休结束、1 次
+      长休结束通知顺序正确；菜单栏显示当前轮次 1–4；结束循环回到普通
+      空闲专注。
+- [ ] 5. 其他应用在前台、面板关闭时，横幅仍正常送达。
+- [ ] 6. 睡眠跨过截止时间后唤醒：剩余时间按真实时间正确更新并切换阶段。
+- [ ] 7. 普通启动（**不带** `--test-durations`，该参数会禁用持久化）：
+      修改普通/Focus Cycle 时长、声音开关与提示音、语言；退出重开后
+      设置保留；运行/暂停快照按截止时间恢复。
+- [ ] 8. 用 Safari 下载 GitHub **草稿发布**中的 zip（获得真实 quarantine
+      标记）；下载文件 SHA-256 与随附校验和一致；按 README 的
+      “系统设置 → 隐私与安全性 → 仍要打开”路径首次启动成功。
+- [ ] 9. 在最后一步（或另一个用户）拒绝通知：面板显示可理解的
+      “通知已关闭……系统设置 > 通知”说明，并给出重新开启路径。
+- [ ] 10. 全程不要求联网或账号；断网状态功能完整。
+
+## 人工验证（历史记录）
+
+> 以下为各阶段开发过程中的人工验收记录；上面未勾选项由
+> “0.4.0 人工验收（全新 macOS 用户）”协议在发布前统一覆盖。
 
 - [x] 应用启动后，菜单栏能看到状态图标，展开面板能看到剩余时间。
 - [x] 开始、暂停、继续、重置和跳过均可用。
