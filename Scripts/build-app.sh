@@ -4,7 +4,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-BUILD_ARGS=()
+# 默认 debug 构建；发布脚本用 STANDUP_BUILD_CONFIGURATION=release 复用同一套组装流程。
+CONFIGURATION="${STANDUP_BUILD_CONFIGURATION:-debug}"
+# 架构通过空格分隔的列表配置，例如 STANDUP_BUILD_ARCHS="arm64 x86_64" 生成通用二进制。
+# 不设置时只编译当前机器架构。
+BUILD_ARGS=(-c "$CONFIGURATION")
+for ARCH in ${STANDUP_BUILD_ARCHS:-}; do
+    BUILD_ARGS+=(--arch "$ARCH")
+done
 if [[ "${STANDUP_BUILD_DISABLE_SANDBOX:-0}" == "1" ]]; then
     BUILD_ARGS+=(--disable-sandbox)
 fi
@@ -40,6 +47,17 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING/Contents/MacOS"
 mkdir -p "$STAGING/Contents/Resources"
 cp "$BIN_DIR/StandUpTimerApp" "$STAGING/Contents/MacOS/StandUpTimerApp"
+
+# 指定了架构列表时必须核对实际产物，避免发布包里悄悄少了某个架构。
+if [[ -n "${STANDUP_BUILD_ARCHS:-}" ]]; then
+    EXPECTED_ARCHS="$(printf '%s\n' $STANDUP_BUILD_ARCHS | sort | tr '\n' ' ' | sed 's/ $//')"
+    ACTUAL_ARCHS="$(lipo -archs "$STAGING/Contents/MacOS/StandUpTimerApp" | tr ' ' '\n' | sort | tr '\n' ' ' | sed 's/ $//')"
+    if [[ "$ACTUAL_ARCHS" != "$EXPECTED_ARCHS" ]]; then
+        echo "错误：产物架构为 ${ACTUAL_ARCHS}，预期 ${EXPECTED_ARCHS}。" >&2
+        exit 1
+    fi
+fi
+
 cp -R "$RESOURCE_BUNDLE" "$STAGING/Contents/Resources/"
 cp "$ICON" "$STAGING/Contents/Resources/AppIcon.icns"
 cp "$ROOT/Support/Info.plist" "$STAGING/Contents/Info.plist"

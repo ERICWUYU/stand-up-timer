@@ -4,7 +4,7 @@
 
 ## 下载安装
 
-从 [Releases](https://github.com/ERICWUYU/stand-up-timer/releases/latest) 下载 `StandUpTimer-0.3.1-macos-universal.zip`，解压后将 `StandUpTimer.app` 拖入“应用程序”文件夹。
+从 [Releases](https://github.com/ERICWUYU/stand-up-timer/releases/latest) 下载 `StandUpTimer-0.4.0-macos-universal.zip`，解压后将 `StandUpTimer.app` 拖入“应用程序”文件夹。
 
 - 通用二进制，支持 Apple Silicon 与 Intel Mac。
 - 最低系统版本：macOS 13。
@@ -19,6 +19,7 @@
 - 已完成阶段 4：可调专注/休息时长、持久化声音开关，以及按绝对截止时间保存和恢复运行、暂停、空闲状态。
 - 已完成阶段 4B：一键四轮连续模式；4 次专注与 3 次短休交替，第 4 次专注后进入长休，长休结束回到普通空闲专注。
 - 已完成阶段 5A：普通计时器与 Focus Cycle 的时长相互独立；旧设置自动迁移，修改时长只影响后续阶段，运行中当前阶段保持不变。
+- 已完成 0.4.0：修复通知横幅显示空白图标的问题；应用启用新的 bundle id，首次启动自动迁移旧设置，通知权限需要重新授权一次。
 - 自动化测试 78/78 通过；签名 `.app` 构建检查通过。
 - 已通过人工验收：完整四轮流程、短休与长休切换、计时恢复、通知与提示音、中英文界面，以及底部控件单行无换行或截断的紧凑布局。
 - 阶段 5A 人工验收已通过：普通计时器与 Focus Cycle 的独立时长设置界面及四轮运行行为正常；设置窗口能正确置前、复用同一窗口，并遵循正常窗口层级。
@@ -57,5 +58,7 @@ Scripts/build-app.sh
 ```
 
 `swift test` 运行全部核心测试；`Scripts/build-app.sh` 生成 `.build/StandUpTimer.app`。
+
+发布时运行 `Scripts/release.sh`：以 release 配置生成 arm64 + x86_64 通用二进制，产出 `dist/StandUpTimer-<版本>-macos-universal.zip` 和 `SHA256SUMS.txt`。
 
 打包图标资源需要 Xcode 提供的 `actool`（用于把 `Support/Assets.xcassets` 编译成 `Assets.car`）；只安装 Command Line Tools 时 `swift test` 仍可运行，但无法完成 app 打包。

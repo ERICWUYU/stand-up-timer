@@ -11,6 +11,8 @@ xcuserdata/
 
 # Local AI tooling and configuration
 claude-deepseek
+.english-buddy.json
+CODEX_ACCOUNT2_LOCAL.md
 .claude/
 .cc-suite/
 .cc-suite.md
