@@ -62,7 +62,7 @@
 
 
 "notification.note.unknown" = "Notification permission will be requested when you start the timer.";
-"notification.note.denied" = "Notifications are off. Enable them in System Settings > Notifications.";
+"notification.note.denied" = "Notifications are off. Enable them in Settings.";
 "notification.note.unavailable" = "Notifications require the packaged .app built with Scripts/build-app.sh.";
 
 "notification.note.scheduleFailed" = "Couldn't schedule the reminder. Check notification settings and try again.";

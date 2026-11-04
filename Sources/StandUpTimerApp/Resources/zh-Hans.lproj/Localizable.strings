@@ -62,7 +62,7 @@
 
 
 "notification.note.unknown" = "开始计时时会请求通知权限，用于专注和休息结束提醒。";
-"notification.note.denied" = "通知已关闭，将收不到起身提醒。可在系统设置 > 通知中重新开启。";
+"notification.note.denied" = "通知已关闭，请在系统设置中开启。";
 "notification.note.unavailable" = "通知不可用：请通过 Scripts/build-app.sh 生成 .app 后运行。";
 
 "notification.note.scheduleFailed" = "提醒安排失败，请检查通知设置后重试。";
