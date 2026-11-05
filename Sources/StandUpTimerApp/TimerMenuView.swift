@@ -3,6 +3,8 @@ import SwiftUI
 
 struct TimerMenuView: View {
     @ObservedObject var model: TimerModel
+    /// 打开设置窗的动作，由控制器注入：先关闭面板，再展示设置窗。
+    var onOpenSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -140,33 +142,18 @@ struct TimerMenuView: View {
                 .buttonStyle(.plain)
             }
         }
+        // 面板背景、圆角和描边由 StatusItemPanelController 的 NSPanel
+        // 根容器统一提供；SwiftUI 内容本身保持透明，不绘制任何背景。
+        // 先内边距、再固定宽度：PanelLayout.panelWidth 是含 padding 的
+        // 总宽，正文宽 256pt；垂直 12pt 留白保证上下对称，并让两行 hint
+        // 有足够高度不被压缩。通知权限改由控制器在每次 showPanel() 时刷新。
         .padding(.horizontal, 12)
-        // 下面的负 padding 抵消 MenuBarExtra 的 16pt 内边距；
-        // 这里用 16 与之相抵，净边距为 0，内容不会超出窗口被裁掉。
-        .padding(.vertical, 16)
-        .frame(width: 280)
-        // 毛玻璃背景铺在内容之下；圆角和描边由窗口图层绘制，
-        // 下面的负 padding 会把方形背景裁成窗口的圆角。
-        .background {
-            ZStack {
-                PanelMaterialBackground()
-                // 叠一层浅色，让背景比系统菜单更亮一些。
-                Color.white.opacity(0.18)
-            }
-        }
-        .background(PanelWindowStyler())
-        // MenuBarExtra(.window) 会在内容上下各留一段内边距，
-        // 用负值抵消，让面板紧贴菜单栏和内容，不留空白。
-        .padding(.vertical, -16)
-        .onAppear {
-            model.refreshNotificationPermission()
-        }
+        .padding(.vertical, 12)
+        .frame(width: PanelLayout.panelWidth)
     }
 
     private var settingsButton: some View {
-        Button {
-            SettingsWindowController.shared.show(model: model)
-        } label: {
+        Button(action: onOpenSettings) {
             settingsLabel
         }
         .buttonStyle(.plain)
