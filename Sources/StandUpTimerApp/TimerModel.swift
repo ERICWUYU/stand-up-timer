@@ -15,6 +15,8 @@ final class TimerModel: ObservableObject {
     @Published private(set) var notificationPermission: NotificationManager.Permission = .unknown
     /// 提醒排程失败时置位，界面据此显示可理解的提示，而不是静默失败。
     @Published private(set) var notificationScheduleFailed = false
+    /// 活动历史的非致命问题（损坏隔离、写入失败等）；计时永不因此中断。
+    @Published private(set) var historyNotice: HistoryNotice?
 
     private var timer: StandUpTimer
     private var ticker: AnyCancellable?
@@ -22,13 +24,19 @@ final class TimerModel: ObservableObject {
     private let soundPlayer = SoundPreviewPlayer()
     private let store: TimerSettingsStore
     private let storage: TimerStorage
+    /// 活动历史存储；`--test-durations` 覆盖模式下写入被统一短路。
+    private let historyStore: ActivityHistoryStoring
     /// `--test-durations` 模式不恢复、也不写回任何持久化数据。
     private let persistsState: Bool
     private var notificationSyncTask: Task<Void, Never>?
     /// 退出流程开始后不再接受新的排程，避免清空提醒之后又被排上新的。
     private var isQuitting = false
 
-    init(now: Date = Date(), storage: TimerStorage = UserDefaultsTimerStorage()) {
+    init(
+        now: Date = Date(),
+        storage: TimerStorage = UserDefaultsTimerStorage(),
+        historyStore: ActivityHistoryStoring? = nil
+    ) {
         self.now = now
         self.storage = storage
 
@@ -49,6 +57,25 @@ final class TimerModel: ObservableObject {
         self.reminderSound = store.reminderSound
         self.timer = startup.timer
         self.persistsState = startup.persistsState
+
+        // 生产环境默认落盘到 Application Support；文件不可用时退化为进程内
+        // 内存存储，保证计时功能不被存储问题拖垮。测试可注入替身。
+        if let historyStore {
+            self.historyStore = historyStore
+        } else {
+            do {
+                let fileStore = try FileHistoryStore()
+                self.historyStore = fileStore
+                self.historyNotice = fileStore.loadNotice
+            } catch {
+                self.historyStore = InMemoryActivityHistory()
+                self.historyNotice = .storageUnavailable
+            }
+        }
+
+        // 离线期间按计划截止点结算出的转换在此时补写；日期是各自的截止点，
+        // 不是重启时间。覆盖模式 persistsState == false，统一不写历史。
+        appendHistory(startup.settledTransitions.map(ActivityRecord.completed(from:)))
 
         // 启动时立即清理上一次运行遗留的提醒。
         notifications.cancelPending()
@@ -352,32 +379,42 @@ final class TimerModel: ObservableObject {
 
     func performPrimaryAction() {
         let date = Date()
+        var settledTransitions: [PhaseTransition] = []
         switch timer.status {
         case .idle:
             timer.start(at: date)
         case .running:
-            timer.pause(at: date)
+            // 点击暂停的瞬间若阶段刚好到期，核心会先结算转换而不是暂停新阶段；
+            // 这些自然结束同样要写入历史。
+            settledTransitions = timer.pause(at: date)
         case .paused:
             timer.resume(at: date)
         }
         now = date
         saveState(at: date)
+        appendHistory(settledTransitions.map(ActivityRecord.completed(from:)))
         notificationsDidChange(requestAuthorization: timer.status == .running)
     }
 
     func reset() {
-        timer.reset()
         let date = Date()
+        // 必须在状态变更前取记录：活动时长由变更前的剩余时间计算。
+        let cancelled = timer.explicitOutcomeRecord(at: date, outcome: .cancelled)
+        timer.reset()
         now = date
         saveState(at: date)
+        appendHistory(cancelled.map { [$0] } ?? [])
         notificationsDidChange(requestAuthorization: false)
     }
 
     func skip() {
         let date = Date()
+        // 空闲阶段的 Skip 只是导航，核心对 idle 状态返回 nil，不产生记录。
+        let skipped = timer.explicitOutcomeRecord(at: date, outcome: .skipped)
         timer.skip(at: date)
         now = date
         saveState(at: date)
+        appendHistory(skipped.map { [$0] } ?? [])
         notificationsDidChange(requestAuthorization: timer.status == .running)
     }
 
@@ -393,19 +430,24 @@ final class TimerModel: ObservableObject {
     /// 取消四轮系列：清除系列提醒并回到普通空闲专注。
     func cancelFourRounds() {
         guard timer.isSeriesActive else { return }
-        timer.cancelFourRounds()
         let date = Date()
+        // 仅当系列当前阶段已实际运行/暂停且有非零活动时间时才记为 cancelled。
+        let cancelled = timer.explicitOutcomeRecord(at: date, outcome: .cancelled)
+        timer.cancelFourRounds()
         now = date
         saveState(at: date)
+        appendHistory(cancelled.map { [$0] } ?? [])
         notificationsDidChange(requestAuthorization: false)
     }
 
     /// 由界面定时器调用：先结算到期阶段，再刷新显示时间。
     func update(at date: Date) {
-        if timer.refresh(at: date) {
+        let transitions = timer.settleTransitions(at: date)
+        if !transitions.isEmpty {
             // 阶段自然结束只保存状态，不重排提醒：
             // 重排会把已经过期的截止点当成一条新提醒再发一次。
             saveState(at: date)
+            appendHistory(transitions.map(ActivityRecord.completed(from:)))
         }
         now = date
     }
@@ -431,6 +473,17 @@ final class TimerModel: ObservableObject {
     private func saveState(at date: Date) {
         guard persistsState else { return }
         store.save(snapshot: timer.snapshot(at: date))
+    }
+
+    /// 历史写入统一入口：覆盖模式短路、空数组跳过、失败只提示不抛出，
+    /// 任何磁盘问题都不能打断计时。存储层按稳定 id 去重，重放安全。
+    private func appendHistory(_ records: [ActivityRecord]) {
+        guard persistsState, !records.isEmpty else { return }
+        do {
+            try historyStore.append(records)
+        } catch {
+            historyNotice = .writeFailed
+        }
     }
 
     private func notificationsDidChange(requestAuthorization: Bool) {

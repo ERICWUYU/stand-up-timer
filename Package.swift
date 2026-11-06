@@ -19,6 +19,10 @@ let package = Package(
         .testTarget(
             name: "StandUpTimerCoreTests",
             dependencies: ["StandUpTimerCore"]
+        ),
+        .testTarget(
+            name: "StandUpTimerAppTests",
+            dependencies: ["StandUpTimerApp"]
         )
     ]
 )
