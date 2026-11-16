@@ -72,3 +72,55 @@
 "notification.focusEnd.body" = "专注时间结束，起身活动一下。";
 "notification.breakEnd.title" = "休息结束，可以继续了";
 "notification.breakEnd.body" = "准备好后开始下一轮专注。";
+
+/* Stage 6B 本地统计面板 */
+"action.statistics" = "统计";
+
+"statistics.heading" = "统计数据";
+"statistics.picker.accessibility" = "统计时间范围";
+
+"statistics.window.today" = "今天";
+"statistics.window.last7Days" = "近 7 天";
+"statistics.window.last30Days" = "近 30 天";
+"statistics.window.thisYear" = "今年";
+
+"statistics.noData" = "暂无数据";
+"statistics.unit.minute" = "分钟";
+"statistics.unit.hour" = "小时";
+"statistics.unit.percent" = "%d%%";
+"statistics.duration.lessThanOneMinute" = "不足 1 分钟";
+/* 日期与时间的组合顺序：中文空格分隔；日期/时段语言跟随 AppLanguage，小时制跟随系统。 */
+"statistics.dateTime.format" = "%@ %@";
+
+"statistics.card.focusTime" = "专注时长";
+"statistics.card.focusSessions" = "专注次数";
+"statistics.card.longestFocus" = "最长专注";
+"statistics.card.breakAdherence" = "休息遵守率";
+
+"statistics.chart.day" = "日期";
+"statistics.chart.month" = "月份";
+"statistics.chart.minutes" = "分钟";
+"statistics.chart.series" = "系列";
+"statistics.chart.series.focus" = "专注";
+"statistics.chart.series.rest" = "休息";
+/* 标签式表达：量词在数字前，无需复数规则，1 与多条都自然。 */
+"statistics.chart.summary" = "%@：专注时长 %@，专注 %d 次；休息时长 %@，完成休息 %d 次。";
+
+"statistics.recent.heading" = "最近活动";
+"statistics.recent.detail" = "%@ / %@";
+"statistics.recent.detailAccessibility" = "实际 %@，计划 %@";
+"statistics.recent.completedDetailAccessibility" = "已完成，用时 %@";
+
+"statistics.window.title" = "专注统计";
+
+"statistics.outcome.completed" = "已完成";
+"statistics.outcome.skipped" = "已跳过";
+"statistics.outcome.cancelled" = "已取消";
+
+"statistics.empty.title" = "还没有活动记录";
+"statistics.empty.body" = "完成的专注和休息会显示在这里。";
+
+"statistics.notice.corrupt" = "历史文件无法读取，已被隔离备份；本次已从空历史重新开始。";
+"statistics.notice.storageUnavailable" = "历史存储不可用，本次记录仅保存在内存中，不会落盘。";
+"statistics.notice.writeFailed" = "一次历史写入失败，计时继续；已有记录保持不变。";
+"statistics.notice.revealBackup" = "在访达中显示";

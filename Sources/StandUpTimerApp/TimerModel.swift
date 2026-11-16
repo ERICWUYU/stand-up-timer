@@ -17,6 +17,9 @@ final class TimerModel: ObservableObject {
     @Published private(set) var notificationScheduleFailed = false
     /// 活动历史的非致命问题（损坏隔离、写入失败等）；计时永不因此中断。
     @Published private(set) var historyNotice: HistoryNotice?
+    /// 当前全部历史记录（时间升序）。统计窗口直接订阅这份发布数据，
+    /// 只在持久化成功后刷新；写入失败时保持旧值不变。
+    @Published private(set) var activityRecords: [ActivityRecord] = []
 
     private var timer: StandUpTimer
     private var ticker: AnyCancellable?
@@ -35,7 +38,8 @@ final class TimerModel: ObservableObject {
     init(
         now: Date = Date(),
         storage: TimerStorage = UserDefaultsTimerStorage(),
-        historyStore: ActivityHistoryStoring? = nil
+        historyStore: ActivityHistoryStoring? = nil,
+        makeHistoryStore: () throws -> ActivityHistoryStoring = { try FileHistoryStore() }
     ) {
         self.now = now
         self.storage = storage
@@ -59,19 +63,31 @@ final class TimerModel: ObservableObject {
         self.persistsState = startup.persistsState
 
         // 生产环境默认落盘到 Application Support；文件不可用时退化为进程内
-        // 内存存储，保证计时功能不被存储问题拖垮。测试可注入替身。
+        // 内存存储，保证计时功能不被存储问题拖垮。测试可直接注入替身，
+        // 或注入会抛错的工厂来验证 storageUnavailable 降级路径。
+        let resolvedStore: ActivityHistoryStoring
         if let historyStore {
-            self.historyStore = historyStore
+            resolvedStore = historyStore
+            // 注入的文件存储同样要把加载期通知（典型：损坏隔离）传给界面。
+            if let fileStore = historyStore as? FileHistoryStore {
+                self.historyNotice = fileStore.loadNotice
+            }
         } else {
             do {
-                let fileStore = try FileHistoryStore()
-                self.historyStore = fileStore
-                self.historyNotice = fileStore.loadNotice
+                let created = try makeHistoryStore()
+                resolvedStore = created
+                if let fileStore = created as? FileHistoryStore {
+                    self.historyNotice = fileStore.loadNotice
+                }
             } catch {
-                self.historyStore = InMemoryActivityHistory()
+                resolvedStore = InMemoryActivityHistory()
                 self.historyNotice = .storageUnavailable
             }
         }
+        self.historyStore = resolvedStore
+        // 初始加载与 persistsState 无关：即使是 --test-durations 覆盖模式，
+        // 统计窗口仍能展示磁盘上已有的历史，只是本次进程不再追加。
+        self.activityRecords = resolvedStore.loadRecords()
 
         // 离线期间按计划截止点结算出的转换在此时补写；日期是各自的截止点，
         // 不是重启时间。覆盖模式 persistsState == false，统一不写历史。
@@ -481,6 +497,9 @@ final class TimerModel: ObservableObject {
         guard persistsState, !records.isEmpty else { return }
         do {
             try historyStore.append(records)
+            // 只有落盘成功后才刷新发布数组；失败时保留旧数据，
+            // 统计窗口不会展示磁盘上并不存在的记录。
+            activityRecords = historyStore.loadRecords()
         } catch {
             historyNotice = .writeFailed
         }

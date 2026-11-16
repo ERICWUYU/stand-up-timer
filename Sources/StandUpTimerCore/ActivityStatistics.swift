@@ -9,12 +9,18 @@ public enum StatisticsWindow: String, Sendable {
     case last7Days
     /// 含参考日在内的最近 30 个自然日。
     case last30Days
+    /// 参考日所在公历年的年初（1 月 1 日 00:00）到参考日结束。
+    /// 这是固定日历年窗口（year-to-date），不是滚动 365 天；
+    /// 覆盖天数随参考日期变化，由 Calendar 按参考日推导，闰年自动正确。
+    case thisYear
 
-    var dayCount: Int {
+    /// 固定长度窗口覆盖的自然日数；`.thisYear` 没有固定天数，返回 nil。
+    var fixedDayCount: Int? {
         switch self {
         case .today: return 1
         case .last7Days: return 7
         case .last30Days: return 30
+        case .thisYear: return nil
         }
     }
 }
@@ -60,7 +66,7 @@ public enum ActivityStatisticsCalculator {
     ///
     /// - Parameters:
     ///   - records: 任意顺序的历史记录，内部只做筛选，不修改入参。
-    ///   - window: 今天 / 近 7 日 / 近 30 日。
+    ///   - window: 今天 / 近 7 日 / 近 30 日 / 今年（日历年年初到参考日）。
     ///   - reference: “现在”的参考时刻，测试注入固定日期。
     ///   - calendar: 日历（其 timeZone 会被显式替换为传入时区）。
     ///   - timeZone: 计算自然日边界使用的时区。
@@ -75,17 +81,15 @@ public enum ActivityStatisticsCalculator {
         calendar.timeZone = timeZone
 
         let todayStart = calendar.startOfDay(for: reference)
-        guard
-            let windowStart = calendar.date(
-                byAdding: .day,
-                value: -(window.dayCount - 1),
-                to: todayStart
-            ),
-            let exclusiveEnd = calendar.date(byAdding: .day, value: 1, to: todayStart)
-        else {
+        guard let exclusiveEnd = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: todayStart
+        ) else {
             preconditionFailure("日历计算自然日边界失败")
         }
-        let range = DateInterval(start: windowStart, end: exclusiveEnd)
+        let base = windowBase(for: window, todayStart: todayStart, calendar: calendar)
+        let range = DateInterval(start: base.start, end: exclusiveEnd)
 
         let inWindow = records.filter { record in
             record.date >= range.start && record.date < range.end
@@ -103,9 +107,9 @@ public enum ActivityStatisticsCalculator {
         // DST 切换日由 Calendar 负责 23/25 小时的边界。
         var buckets: [Date: ActivityDayBucket] = [:]
         var orderedDays: [Date] = []
-        orderedDays.reserveCapacity(window.dayCount)
-        for offset in 0..<window.dayCount {
-            guard let day = calendar.date(byAdding: .day, value: offset, to: windowStart) else {
+        orderedDays.reserveCapacity(base.dayCount)
+        for offset in 0..<base.dayCount {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: base.start) else {
                 preconditionFailure("日历计算桶日期失败")
             }
             orderedDays.append(day)
@@ -175,6 +179,44 @@ public enum ActivityStatisticsCalculator {
             breakAdherence: adherence,
             dayBuckets: orderedDays.map { buckets[$0]! }
         )
+    }
+
+    /// 计算窗口起点（含）与覆盖的自然日数。
+    ///
+    /// 固定窗口从参考日往前数 `dayCount - 1` 天；今年窗口取公历年
+    /// 1 月 1 日 00:00，桶数为年初到参考日（含当天）之间的日历日数。
+    /// 所有日期数学都经由 Calendar 完成，不假设一天 86400 秒，
+    /// 因此闰年与 DST 切换日（23/25 小时）都能得到恰好一个桶。
+    private static func windowBase(
+        for window: StatisticsWindow,
+        todayStart: Date,
+        calendar: Calendar
+    ) -> (start: Date, dayCount: Int) {
+        switch window {
+        case .today, .last7Days, .last30Days:
+            let dayCount = window.fixedDayCount!
+            guard let start = calendar.date(
+                byAdding: .day,
+                value: -(dayCount - 1),
+                to: todayStart
+            ) else {
+                preconditionFailure("日历计算自然日边界失败")
+            }
+            return (start, dayCount)
+        case .thisYear:
+            // 只保留年份组件再构造日期：在注入时区下得到今年 1 月 1 日 00:00。
+            let yearComponents = calendar.dateComponents([.year], from: todayStart)
+            guard let yearStart = calendar.date(from: yearComponents) else {
+                preconditionFailure("日历计算年初边界失败")
+            }
+            // 两个本地午夜之间的 .day 差即跨过的日历日数；+1 把参考日当天计入。
+            let elapsedDays = calendar.dateComponents(
+                [.day],
+                from: yearStart,
+                to: todayStart
+            ).day ?? 0
+            return (yearStart, elapsedDays + 1)
+        }
     }
 
     /// 最近历史，按日期降序（newest first）；同一时刻按 id 字典序兜底，

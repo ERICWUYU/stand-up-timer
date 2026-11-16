@@ -282,4 +282,220 @@ final class ActivityStatisticsTests: XCTestCase {
 
         XCTAssertEqual(ActivityStatisticsCalculator.recentRecords(records, limit: 0), [])
     }
+
+    // MARK: 5. 今年窗口（日历年 year-to-date，半开区间）
+
+    func testThisYearWindowRunsFromJanFirstToTomorrowMidnight() {
+        let ref = date(2026, 6, 15, hour: 12, timeZone: utc)
+
+        let stats = ActivityStatisticsCalculator.aggregate(
+            [],
+            window: .thisYear,
+            reference: ref,
+            calendar: utcCalendar,
+            timeZone: utc
+        )
+
+        XCTAssertEqual(
+            stats.range.start,
+            date(2026, 1, 1, hour: 0, timeZone: utc)
+        )
+        // 半开右端：参考日次日 00:00，而不是下一年元旦。
+        XCTAssertEqual(
+            stats.range.end,
+            date(2026, 6, 16, hour: 0, timeZone: utc)
+        )
+        // 1/1 到 6/15（含）：31+28+31+30+31+15 = 166 个自然日，2026 非闰年。
+        XCTAssertEqual(stats.dayBuckets.count, 166)
+        XCTAssertEqual(
+            stats.dayBuckets.first?.day,
+            date(2026, 1, 1, hour: 0, timeZone: utc)
+        )
+        XCTAssertEqual(
+            stats.dayBuckets.last?.day,
+            date(2026, 6, 15, hour: 0, timeZone: utc)
+        )
+        // 零值桶：空历史下每天一个且全为零，没有未来日期的桶。
+        XCTAssertTrue(stats.dayBuckets.allSatisfy { $0.completedFocusCount == 0 })
+    }
+
+    func testThisYearHalfOpenBoundariesIncludeEndpointsAndExcludeOutside() {
+        let ref = date(2026, 6, 15, hour: 12, timeZone: utc)
+        let yearStart = date(2026, 1, 1, hour: 0, timeZone: utc)
+        let exclusiveEnd = date(2026, 6, 16, hour: 0, timeZone: utc)
+
+        let records = [
+            makeRecord(date: yearStart),                         // 恰好年初，包含
+            makeRecord(date: yearStart.addingTimeInterval(-1)), // 早一秒（上一年），排除
+            makeRecord(date: date(2026, 6, 15, hour: 23, minute: 59, second: 59, timeZone: utc)), // 末秒包含
+            makeRecord(date: exclusiveEnd),                     // 半开端点（次日 00:00），排除
+            makeRecord(date: date(2025, 12, 31, hour: 23, minute: 59, second: 59, timeZone: utc)) // 上一年，排除
+        ]
+
+        let stats = ActivityStatisticsCalculator.aggregate(
+            records,
+            window: .thisYear,
+            reference: ref,
+            calendar: utcCalendar,
+            timeZone: utc
+        )
+
+        XCTAssertEqual(stats.range.start, yearStart)
+        XCTAssertEqual(stats.range.end, exclusiveEnd)
+        XCTAssertEqual(stats.completedFocusCount, 2)
+    }
+
+    func testThisYearOnJanFirstProducesExactlyOneBucket() {
+        let ref = date(2026, 1, 1, hour: 12, timeZone: utc)
+
+        let stats = ActivityStatisticsCalculator.aggregate(
+            [makeRecord(date: ref)],
+            window: .thisYear,
+            reference: ref,
+            calendar: utcCalendar,
+            timeZone: utc
+        )
+
+        XCTAssertEqual(stats.dayBuckets.count, 1)
+        XCTAssertEqual(
+            stats.dayBuckets.first?.day,
+            date(2026, 1, 1, hour: 0, timeZone: utc)
+        )
+        XCTAssertEqual(stats.range.start, date(2026, 1, 1, hour: 0, timeZone: utc))
+        XCTAssertEqual(stats.range.end, date(2026, 1, 2, hour: 0, timeZone: utc))
+        XCTAssertEqual(stats.completedFocusCount, 1)
+    }
+
+    func testThisYearLeapYearCountsFeb29AndAllDaysThroughReference() {
+        // 2024 是闰年；参考日 3 月 1 日：31 + 29 + 1 = 61 个桶。
+        let ref = date(2024, 3, 1, hour: 12, timeZone: utc)
+
+        let stats = ActivityStatisticsCalculator.aggregate(
+            [],
+            window: .thisYear,
+            reference: ref,
+            calendar: utcCalendar,
+            timeZone: utc
+        )
+
+        XCTAssertEqual(stats.dayBuckets.count, 61)
+        XCTAssertEqual(
+            stats.dayBuckets.first?.day,
+            date(2024, 1, 1, hour: 0, timeZone: utc)
+        )
+        XCTAssertEqual(
+            stats.dayBuckets.last?.day,
+            date(2024, 3, 1, hour: 0, timeZone: utc)
+        )
+        // 2 月 29 日必须真实占一个桶，而不是被 86400 秒算术跳过或重复。
+        let feb29 = date(2024, 2, 29, hour: 0, timeZone: utc)
+        XCTAssertTrue(stats.dayBuckets.contains { $0.day == feb29 })
+        XCTAssertEqual(
+            Set(stats.dayBuckets.map(\.day)).count,
+            stats.dayBuckets.count,
+            "桶日期必须互不相同"
+        )
+    }
+
+    func testThisYearNonLeapYearLastDayHas365Buckets() {
+        // 2026 非闰年；参考日为全年最后一天，恰好 365 个桶、无第 366 天。
+        let ref = date(2026, 12, 31, hour: 12, timeZone: utc)
+
+        let stats = ActivityStatisticsCalculator.aggregate(
+            [],
+            window: .thisYear,
+            reference: ref,
+            calendar: utcCalendar,
+            timeZone: utc
+        )
+
+        XCTAssertEqual(stats.dayBuckets.count, 365)
+        XCTAssertEqual(
+            stats.dayBuckets.first?.day,
+            date(2026, 1, 1, hour: 0, timeZone: utc)
+        )
+        XCTAssertEqual(
+            stats.dayBuckets.last?.day,
+            date(2026, 12, 31, hour: 0, timeZone: utc)
+        )
+        // 半开右端是下一年元旦。
+        XCTAssertEqual(stats.range.end, date(2027, 1, 1, hour: 0, timeZone: utc))
+    }
+
+    func testThisYearBucketsFollowCalendarDaysAcrossDST() {
+        // 纽约 2026-03-08 春令时（23 小时）、2026-11-01 秋令时（25 小时）。
+        // 参考日 11 月 5 日：非闰年第 309 天（1–10 月共 304 天 + 5）。
+        let ref = date(2026, 11, 5, hour: 12, timeZone: newYork)
+        let recordOnShortDay = makeRecord(
+            date: date(2026, 3, 8, hour: 10, timeZone: newYork),
+            active: 900
+        )
+
+        let stats = ActivityStatisticsCalculator.aggregate(
+            [recordOnShortDay],
+            window: .thisYear,
+            reference: ref,
+            calendar: utcCalendar,
+            timeZone: newYork
+        )
+
+        XCTAssertEqual(stats.dayBuckets.count, 309)
+
+        let novFirst = date(2026, 11, 1, hour: 0, timeZone: newYork)
+        let novSecond = date(2026, 11, 2, hour: 0, timeZone: newYork)
+        // 秋令时本地午夜间隔 25 小时，证明桶按本地日历日而非固定秒数切分。
+        XCTAssertEqual(novSecond.timeIntervalSince(novFirst), 25 * 3_600)
+        XCTAssertTrue(stats.dayBuckets.contains { $0.day == novFirst })
+        XCTAssertTrue(stats.dayBuckets.contains { $0.day == novSecond })
+
+        let shortDay = date(2026, 3, 8, hour: 0, timeZone: newYork)
+        let bucket = stats.dayBuckets.first { $0.day == shortDay }
+        XCTAssertEqual(bucket?.completedFocusDuration, 900)
+        XCTAssertEqual(bucket?.completedFocusCount, 1)
+        XCTAssertEqual(stats.completedFocusDuration, 900)
+    }
+
+    func testThisYearExcludesPreviousYearAndKeepsAggregationSemantics() {
+        let ref = date(2026, 6, 15, hour: 12, timeZone: utc)
+        let records = [
+            // 上一年的专注与休息全部排除。
+            makeRecord(date: date(2025, 12, 31, hour: 23, timeZone: utc), active: 999),
+            makeRecord(
+                date: date(2025, 12, 30, hour: 10, timeZone: utc),
+                phase: .rest,
+                active: 999
+            ),
+            // 今年的记录参与聚合，遵守率语义与其他窗口完全一致。
+            makeRecord(date: date(2026, 1, 1, hour: 9, timeZone: utc), active: 1_500),
+            makeRecord(
+                date: date(2026, 6, 15, hour: 10, timeZone: utc),
+                phase: .rest,
+                outcome: .completed,
+                active: 300
+            ),
+            makeRecord(
+                date: date(2026, 6, 14, hour: 10, timeZone: utc),
+                phase: .rest,
+                outcome: .skipped,
+                active: 60
+            )
+        ]
+
+        let stats = ActivityStatisticsCalculator.aggregate(
+            records,
+            window: .thisYear,
+            reference: ref,
+            calendar: utcCalendar,
+            timeZone: utc
+        )
+
+        XCTAssertEqual(stats.completedFocusCount, 1)
+        XCTAssertEqual(stats.completedFocusDuration, 1_500)
+        XCTAssertEqual(stats.longestCompletedFocusDuration, 1_500)
+        XCTAssertEqual(stats.completedRestCount, 1)
+        XCTAssertEqual(stats.completedRestDuration, 300)
+        XCTAssertEqual(stats.skippedRestCount, 1)
+        // 1 完成 /（1 完成 + 1 跳过）。
+        XCTAssertEqual(stats.breakAdherence ?? 0, 0.5, accuracy: 0.000_001)
+    }
 }

@@ -150,12 +150,25 @@ final class StatusItemPanelController {
         SettingsWindowController.shared.show(model: model)
     }
 
+    /// 面板内统计按钮的动作：先关面板再展示统计窗，
+    /// 避免 .statusBar 级面板浮在统计窗之上。
+    private func openStatistics() {
+        closePanel()
+        StatisticsWindowController.shared.show(model: model)
+    }
+
     // MARK: - 面板构建
 
     private func makePanel() -> PanelWindow {
-        let hosting = NSHostingView(rootView: TimerMenuView(model: model) { [weak self] in
-            self?.openSettings()
-        })
+        let hosting = NSHostingView(rootView: TimerMenuView(
+            model: model,
+            onOpenSettings: { [weak self] in
+                self?.openSettings()
+            },
+            onOpenStatistics: { [weak self] in
+                self?.openStatistics()
+            }
+        ))
         // 保留默认 intrinsicContentSize 行为：SwiftUI 的固定宽度
         // （.frame(width: 280)）和内容自身的垂直理想尺寸都经它输出，
         // 面板尺寸只由这个理想尺寸驱动，不读取面板当前尺寸，无反馈回路。
@@ -377,6 +390,9 @@ enum PanelLayout {
     /// 面板固定宽度（含 SwiftUI 内边距的总宽），窗口初始尺寸与
     /// TimerMenuView 的 .frame(width:) 共用这一个来源。
     static let panelWidth: CGFloat = 280
+    /// SwiftUI 内容两侧水平内边距；正文可用宽度 = 280 - 2×12 = 256。
+    static let horizontalPadding: CGFloat = 12
+    static var contentWidth: CGFloat { panelWidth - 2 * horizontalPadding }
 }
 
 /// 面板唯一的裁剪根容器：透明、layer-backed，只负责 continuous 圆角和
