@@ -62,7 +62,7 @@
 
 
 "notification.note.unknown" = "Notification permission will be requested when you start the timer.";
-"notification.note.denied" = "Notifications are off. Enable them in System Settings > Notifications.";
+"notification.note.denied" = "Notifications are off. Enable them in Settings.";
 "notification.note.unavailable" = "Notifications require the packaged .app built with Scripts/build-app.sh.";
 
 "notification.note.scheduleFailed" = "Couldn't schedule the reminder. Check notification settings and try again.";
@@ -72,3 +72,55 @@
 "notification.focusEnd.body" = "Focus time is over — stand up and move around.";
 "notification.breakEnd.title" = "Break is over";
 "notification.breakEnd.body" = "Start the next focus session when you're ready.";
+
+/* Stage 6B 本地统计面板 */
+"action.statistics" = "Statistics";
+
+"statistics.heading" = "Statistics";
+"statistics.picker.accessibility" = "Statistics time range";
+
+"statistics.window.today" = "Today";
+"statistics.window.last7Days" = "Last 7 Days";
+"statistics.window.last30Days" = "Last 30 Days";
+"statistics.window.thisYear" = "This Year";
+
+"statistics.noData" = "No data";
+"statistics.unit.minute" = "min";
+"statistics.unit.hour" = "h";
+"statistics.unit.percent" = "%d%%";
+"statistics.duration.lessThanOneMinute" = "<1 min";
+/* 日期与时间的组合顺序：英文逗号分隔；日期/时段语言跟随 AppLanguage，小时制跟随系统。 */
+"statistics.dateTime.format" = "%@, %@";
+
+"statistics.card.focusTime" = "Focus time";
+"statistics.card.focusSessions" = "Focus sessions";
+"statistics.card.longestFocus" = "Longest focus";
+"statistics.card.breakAdherence" = "Break adherence";
+
+"statistics.chart.day" = "Day";
+"statistics.chart.month" = "Month";
+"statistics.chart.minutes" = "Minutes";
+"statistics.chart.series" = "Series";
+"statistics.chart.series.focus" = "Focus";
+"statistics.chart.series.rest" = "Rest";
+/* Label-style summary: nouns precede numbers so no plural rule is required. */
+"statistics.chart.summary" = "%@: focus time %@; focus sessions %d; break time %@; completed breaks %d.";
+
+"statistics.recent.heading" = "Recent activity";
+"statistics.recent.detail" = "%@ / %@";
+"statistics.recent.detailAccessibility" = "Active %@, planned %@";
+"statistics.recent.completedDetailAccessibility" = "Completed in %@";
+
+"statistics.window.title" = "Focus Statistics";
+
+"statistics.outcome.completed" = "Completed";
+"statistics.outcome.skipped" = "Skipped";
+"statistics.outcome.cancelled" = "Cancelled";
+
+"statistics.empty.title" = "No activity yet";
+"statistics.empty.body" = "Completed focus and break sessions will appear here.";
+
+"statistics.notice.corrupt" = "The history file was unreadable and has been quarantined. A new empty history was started.";
+"statistics.notice.storageUnavailable" = "History storage is unavailable. This session is kept in memory and will not be saved.";
+"statistics.notice.writeFailed" = "A history write failed. The timer keeps running; earlier records are unchanged.";
+"statistics.notice.revealBackup" = "Show in Finder";

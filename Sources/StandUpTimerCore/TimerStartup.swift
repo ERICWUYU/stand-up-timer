@@ -7,6 +7,9 @@ public struct TimerStartupResult: Sendable {
     public let usesOverride: Bool
     /// 覆盖模式下不写持久化状态，避免测试时长污染用户数据。
     public let persistsState: Bool
+    /// 从快照恢复时，应用关闭期间按计划截止点结算出的自然结束转换，
+    /// 按时间顺序排列。调用方据此补写历史；覆盖模式与全新启动为空。
+    public let settledTransitions: [PhaseTransition]
 }
 
 /// 决定应用启动时使用哪个计时器，以及是否需要持久化状态。
@@ -32,7 +35,8 @@ public enum TimerStartup {
                     cycleLongRestDuration: overrideDuration
                 ),
                 usesOverride: true,
-                persistsState: false
+                persistsState: false,
+                settledTransitions: []
             )
         }
 
@@ -46,12 +50,14 @@ public enum TimerStartup {
                 cycleLongRestDuration: settings.cycleLongRestDuration
             )
             // 用注入的当前时间连续结算关闭期间跨过的阶段，
-            // 不会重新得到一整段完整时长。
-            timer.refresh(at: now)
+            // 不会重新得到一整段完整时长。保留每个转换用于补写历史：
+            // 记录的日期是各自的计划截止点，而不是本次重启时间。
+            let settledTransitions = timer.settleTransitions(at: now)
             return TimerStartupResult(
                 timer: timer,
                 usesOverride: false,
-                persistsState: true
+                persistsState: true,
+                settledTransitions: settledTransitions
             )
         }
 
@@ -64,7 +70,8 @@ public enum TimerStartup {
                 cycleLongRestDuration: settings.cycleLongRestDuration
             ),
             usesOverride: false,
-            persistsState: true
+            persistsState: true,
+            settledTransitions: []
         )
     }
 }

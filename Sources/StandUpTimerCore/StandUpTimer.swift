@@ -236,16 +236,20 @@ public struct StandUpTimer: Sendable {
 
     /// 暂停并冻结剩余时长。
     ///
-    /// 如果此刻阶段已经到期，先结算到期转换，不会把新阶段暂停在 0。
-    public mutating func pause(at now: Date) {
-        guard status == .running else { return }
+    /// 如果此刻阶段已经到期，先结算到期转换，不会把新阶段暂停在 0；
+    /// 这种情况下返回本次自然结束的转换，调用方据此写入历史，返回空数组
+    /// 才表示真正进入了暂停。
+    @discardableResult
+    public mutating func pause(at now: Date) -> [PhaseTransition] {
+        guard status == .running else { return [] }
 
-        let didEndPhase = refresh(at: now)
-        guard !didEndPhase, let deadline else { return }
+        let transitions = settleTransitions(at: now)
+        guard transitions.isEmpty, let deadline else { return transitions }
 
         storedRemaining = max(0, deadline.timeIntervalSince(now))
         self.deadline = nil
         status = .paused
+        return []
     }
 
     /// 从暂停时冻结的剩余时长继续。
@@ -298,10 +302,29 @@ public struct StandUpTimer: Sendable {
     /// 若一次刷新跨过多个阶段，会连续结算。返回值表示本次调用是否至少结束了一个阶段。
     @discardableResult
     public mutating func refresh(at now: Date) -> Bool {
-        var didEndPhase = false
+        !settleTransitions(at: now).isEmpty
+    }
+
+    /// 结算所有已到期的阶段，并按时间顺序返回每个自然结束的阶段转换。
+    ///
+    /// 转换在状态变更**之前**捕获，因此长休结束导致的系列复位、普通休息结束
+    /// 导致的空闲复位都不会污染转换本身的模式/轮次/休息类型。一次刷新跨过
+    /// 多个阶段时返回多个转换，不能只比对结算前后的最终状态。
+    @discardableResult
+    public mutating func settleTransitions(at now: Date) -> [PhaseTransition] {
+        var transitions: [PhaseTransition] = []
 
         while status == .running, let deadline, now >= deadline {
-            didEndPhase = true
+            transitions.append(
+                PhaseTransition(
+                    phase: phase,
+                    mode: mode,
+                    focusRound: focusRound,
+                    restKind: restKind,
+                    scheduledCompletion: deadline,
+                    plannedDuration: currentPhaseFullDuration
+                )
+            )
 
             switch phase {
             case .focus:
@@ -336,7 +359,36 @@ public struct StandUpTimer: Sendable {
             }
         }
 
-        return didEndPhase
+        return transitions
+    }
+
+    /// 为用户主动触发的 Skip/Reset/Cancel 构造一条显式结果记录。
+    ///
+    /// 必须在变更计时器状态**之前**调用：活动时长按“当前阶段完整时长减去
+    /// 注入时刻的剩余时间”计算，暂停的墙上时间因为冻结了剩余时间而被自然
+    /// 排除。空闲阶段从未启动，返回 nil（Skip 空闲阶段只是导航，不污染统计）。
+    ///
+    /// - `.skipped`：仅当阶段处于 running/paused 时记录。
+    /// - `.cancelled`：在 running/paused 基础上还要求已有非零活动时间。
+    public func explicitOutcomeRecord(
+        at now: Date,
+        outcome: ActivityRecord.Outcome
+    ) -> ActivityRecord? {
+        guard status == .running || status == .paused else { return nil }
+
+        let activeDuration = max(0, currentPhaseFullDuration - remaining(at: now))
+        if outcome == .cancelled, activeDuration <= 0 { return nil }
+
+        return ActivityRecord(
+            date: now,
+            phase: phase,
+            mode: mode,
+            focusRound: focusRound,
+            restKind: restKind,
+            outcome: outcome,
+            plannedDuration: currentPhaseFullDuration,
+            activeDuration: activeDuration
+        )
     }
 
     // MARK: - 内部转换
