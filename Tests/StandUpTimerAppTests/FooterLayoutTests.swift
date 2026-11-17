@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import StandUpTimerApp
 
@@ -124,13 +125,56 @@ final class FooterLayoutTests: XCTestCase {
 
     // MARK: 测量部件：真实 SF Symbol 度量 + 模式按钮宽度公式
 
-    func testSymbolWidthsComeFromRealMeasurement() {
-        // 13pt medium 实测：圆形/齿轮/电源符号 16pt，柱状图符号 18pt。
-        XCTAssertEqual(FooterLayout.iconWidth(systemName: "gearshape"), 16)
-        XCTAssertEqual(FooterLayout.iconWidth(systemName: "power"), 16)
-        XCTAssertEqual(FooterLayout.iconWidth(systemName: "repeat.circle"), 16)
-        XCTAssertEqual(FooterLayout.iconWidth(systemName: "xmark.circle"), 16)
-        XCTAssertEqual(FooterLayout.iconWidth(systemName: "chart.bar.xaxis"), 18)
+    func testSymbolWidthsComeFromRealMeasurement() throws {
+        // SF Symbol 的字形度量随 macOS / SF Symbols 版本变化（同一 13pt medium
+        // 配置下，chart.bar.xaxis 在不同系统上实测分别为 18pt、19pt），因此像素
+        // 宽度绝不能硬编码进测试。这里用与生产完全相同的共享常量构造符号配置，
+        // 在当前系统上实测取期望值，再断言生产测量方法与该系统度量一致、宽度为正
+        // 且能容纳进 28pt 命中区，并验证同进程内重复测量稳定。
+        let configuration = NSImage.SymbolConfiguration(
+            pointSize: FooterLayout.footerFontPointSize,
+            weight: FooterLayout.footerFontWeight
+        )
+        let knownSymbols = [
+            "chart.bar.xaxis",
+            "gearshape",
+            "power",
+            "repeat.circle",
+            "xmark.circle"
+        ]
+        for systemName in knownSymbols {
+            // XCTUnwrap 证明系统确实提供该符号，且接受当前 pointSize/weight 配置。
+            let symbol = try XCTUnwrap(
+                NSImage(systemSymbolName: systemName, accessibilityDescription: nil),
+                "系统未提供 SF Symbol：\(systemName)"
+            )
+            let configuredImage = try XCTUnwrap(
+                symbol.withSymbolConfiguration(configuration),
+                "符号 \(systemName) 拒绝当前符号配置"
+            )
+            let systemMeasuredWidth = configuredImage.size.width
+            let measuredWidth = FooterLayout.iconWidth(systemName: systemName)
+
+            XCTAssertGreaterThan(
+                systemMeasuredWidth, 0,
+                "\(systemName) 的系统实测宽度非正"
+            )
+            // 生产测量必须等于当前系统的真实配置度量，而非任何固定像素常量。
+            XCTAssertEqual(
+                measuredWidth, systemMeasuredWidth,
+                "\(systemName) 的生产测量与系统配置图像宽度不一致"
+            )
+            // 每个底栏符号都必须安全容纳于共享的正方形命中区内。
+            XCTAssertLessThanOrEqual(
+                measuredWidth, FooterLayout.utilityHitSize,
+                "\(systemName) 宽度 \(measuredWidth) 超出命中区 \(FooterLayout.utilityHitSize)pt"
+            )
+            // 同进程重复测量必须稳定：度量在单次运行内确定、无缓存或随机差异。
+            XCTAssertEqual(
+                FooterLayout.iconWidth(systemName: systemName), measuredWidth,
+                "\(systemName) 重复测量结果不稳定"
+            )
+        }
         // 不存在的符号退回字号宽度，而不是崩溃或返回 0。
         XCTAssertEqual(
             FooterLayout.iconWidth(systemName: "definitely.not.a.symbol"),
