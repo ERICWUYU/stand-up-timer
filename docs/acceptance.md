@@ -2,7 +2,7 @@
 
 ## 自动化验证
 
-- [x] 运行 `swift test`，78/78 个测试通过。
+- [x] 运行 `swift test`，当前基线 220/220 个测试通过（StandUpTimerCore 149 + StandUpTimerApp 71；本节下方各历史条目里出现的 78/78、85/85 等数字是对应阶段执行时的历史记录，原样保留）。
 - [x] `Scripts/build-app.sh` 产出签名 `.app`，语言与通知资源完整。
 - [x] 新计时器默认为 25 分钟专注阶段。
 - [x] 开始后状态变为运行中。
@@ -84,10 +84,72 @@ id 的快照与迁移哨兵，不能作为图标和首次迁移的证据；只�
       “通知已关闭……系统设置 > 通知”说明，并给出重新开启路径。
 - [ ] 10. 全程不要求联网或账号；断网状态功能完整。
 
+## v0.5.0 发布验收（待执行）
+
+> 本小节是 v0.5.0 发布前的待执行协议。2026-11-18 的发布准备批次只做版本/文档
+> 修改与自动化打包验证，以下**所有人工项目在该批次中均未执行**，实际验证前一律
+> 不得勾选。上方 0.4.0 小节保持历史性质，不改写为 0.5.0 协议。归档必须从最终
+> release commit/tag 的干净检出只构建一次，验收通过的字节即上传发布的字节。
+
+### 隔离手段与标签边界
+
+- `CFFIXED_USER_HOME` 只重定向文件域（如 Application Support 下的
+  `activity-history.json`）；本机已证实 CFPreferences/cfprefsd 不遵循该环境
+  变量，系统通知权限按 bundle id 授权同样不受其隔离。正式人工验收必须使用
+  干净 macOS 用户，不得把该环境变量当作偏好域或通知权限的可靠隔离手段。
+- 发布标签只能显式按名推送（`git push origin v0.5.0`）；**禁止
+  `git push --tags`**，以免把本地未推送的历史标签 v0.4.0 误推到远端。
+
+### 归档与自动化检查（待执行）
+
+- [ ] 从精确 release commit/tag 构建，构建前工作树干净（`git status --short`
+      为空）。
+- [ ] 通用二进制：主可执行文件 `lipo -archs` 恰含 `arm64` 与 `x86_64`；
+      `vtool -show-build` 两个切片最低系统均为 macOS 13.0。
+- [ ] ad-hoc 签名：`codesign --verify --deep --strict` 通过；
+      `codesign -dvv` 标识 `com.standuptimer.timer`、ad-hoc、无 Team ID
+      （无 Developer ID/公证是既定约束，发布说明须写明）。
+- [ ] bundle 内 `Info.plist`：版本 0.5.0（build 5）、bundle id
+      `com.standuptimer.timer`、最低 13.0、`LSUIElement`。
+- [ ] `AppIcon.icns` 与 `Assets.car` 均存在且非空；`en.lproj` 与
+      `zh-Hans.lproj` 资源齐备。
+- [ ] ZIP 解压顶层为 `StandUpTimer.app/`（`--keepParent`）；
+      `SHA256SUMS.txt` 只含本次 0.5.0 ZIP 的一条记录，
+      `shasum -a 256 -c` 通过。
+
+### 干净 macOS 用户人工验收（待执行）
+
+- [ ] Gatekeeper 首次打开：经 Safari 下载获得真实 quarantine 标记，下载文件
+      SHA-256 与校验和一致后，按“系统设置 → 隐私与安全性 → 仍要打开”路径
+      启动成功。
+- [ ] **首条通知显示正确、非空白图标**——新 bundle id 通知快照的一次性门禁，
+      失败即停止发布；现有开发账号已有该 id 的快照，其结果不能作为证据。
+- [ ] 旧 bundle id `com.standuptimer.menubar` 设置一次性迁移到
+      `com.standuptimer.timer`：旧值齐全、旧域只读不写、哨兵置位、再次启动
+      不覆盖用户改动、部分预置时只补缺失键。
+- [ ] 新 bundle id 下通知权限仅请求一次，授权状态正确；拒绝通知的说明文案
+      与重新开启路径放在最后验证。
+- [ ] `activity-history.json` 在首次阶段转换后创建、内容为有效 JSON、版本
+      字段正确；损坏场景隔离为 `activity-history.corrupt-*` 副本，应用不崩溃且无误报。
+- [ ] 计时基础：开始/暂停/继续/重置/跳过、绝对截止时间恢复、休眠唤醒后
+      剩余时间正确。
+- [ ] Focus Cycle：4 次专注 + 3 次短休 + 1 次长休的顺序与通知、轮次 1–4
+      显示、结束循环回到普通空闲专注。
+- [ ] 设置：普通计时器与 Focus Cycle 独立时长、声音开关与提示音、语言
+      切换；普通启动（不带 `--test-durations`）退出重开后设置保留。
+- [ ] 统计窗口：单实例复用、置前与窗口层级；Today / Last 7 Days /
+      Last 30 Days / This Year 切换数值正确；日/月柱状图无未来桶；
+      最近 20 条活动独立于所选区间。
+- [ ] 中英文双语、Light/Dark 跟随系统，实时切换且不产生多余窗口。
+- [ ] 架构覆盖：Apple Silicon 本机执行；Intel 侧使用真实 Intel 机器或明确
+      记录的等效验证（如 Rosetta 冒烟），不得虚假声称已在 Intel 实机通过。
+- [ ] 未公证应用的用户说明与 README 一致；全程离线可用、无账号、无网络
+      请求，活动数据不出本机。
+
 ## 人工验证（历史记录）
 
-> 以下为各阶段开发过程中的人工验收记录；上面未勾选项由
-> “0.4.0 人工验收（全新 macOS 用户）”协议在发布前统一覆盖。
+> 以下为各阶段开发过程中的人工验收记录；这些历史勾选状态不替代上方
+> “v0.5.0 发布验收（待执行）”，v0.5.0 仅在该协议逐项完成后方可发布。
 
 - [x] 应用启动后，菜单栏能看到状态图标，展开面板能看到剩余时间。
 - [x] 开始、暂停、继续、重置和跳过均可用。
